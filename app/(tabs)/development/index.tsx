@@ -1,155 +1,594 @@
-import React from 'react';
-import { ScrollView, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  ScrollView, View, Text, StyleSheet, TouchableOpacity, StatusBar,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
 import { Card } from '@/shared/ui/Card';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
 import { useProfileStore } from '@/store/profileStore';
+import { useDevelopmentStore } from '@/store/developmentStore';
+import { MILESTONES, AGE_GROUPS, CATEGORY_CONFIG } from '@/shared/constants/developmentData';
+import type { Milestone, MilestoneCategory } from '@/entities/development/model/types';
 
-interface Milestone {
-  id: string;
-  category: 'motor' | 'cognitive' | 'language' | 'social';
-  label: string;
-  ageRange: string;
-  achieved: boolean;
-  overdue?: boolean;
+// ─── helpers ─────────────────────────────────────────────────────────────────
+
+function getAgeMonths(birthDate: string): number {
+  const birth = new Date(birthDate);
+  const now   = new Date();
+  return (now.getFullYear() - birth.getFullYear()) * 12 + (now.getMonth() - birth.getMonth());
 }
 
-const CATEGORY_CONFIG = {
-  motor:     { label: 'Motor', color: Colors.skyBlue, emoji: '🏃' },
-  cognitive: { label: 'Cognitivo', color: Colors.lavender, emoji: '🧠' },
-  language:  { label: 'Lenguaje', color: Colors.coral, emoji: '💬' },
-  social:    { label: 'Social', color: Colors.mint, emoji: '🤝' },
-};
+type MilestoneStatus = 'achieved' | 'overdue' | 'upcoming';
 
-const MOCK_MILESTONES: Milestone[] = [
-  { id: 'm1', category: 'motor', label: 'Se sienta sin apoyo', ageRange: '6-9 meses', achieved: true },
-  { id: 'm2', category: 'motor', label: 'Gatea', ageRange: '7-10 meses', achieved: true },
-  { id: 'm3', category: 'motor', label: 'Se pone de pie solo', ageRange: '9-12 meses', achieved: true },
-  { id: 'm4', category: 'motor', label: 'Da sus primeros pasos', ageRange: '10-14 meses', achieved: false, overdue: true },
-  { id: 'm5', category: 'cognitive', label: 'Busca objetos escondidos', ageRange: '8-12 meses', achieved: true },
-  { id: 'm6', category: 'cognitive', label: 'Señala con el dedo', ageRange: '10-14 meses', achieved: false },
-  { id: 'm7', category: 'language', label: 'Dice "mamá" y "papá"', ageRange: '9-12 meses', achieved: true },
-  { id: 'm8', category: 'language', label: 'Dice 3 palabras', ageRange: '12-18 meses', achieved: false },
-  { id: 'm9', category: 'social', label: 'Sonrisa social', ageRange: '2-3 meses', achieved: true },
-  { id: 'm10', category: 'social', label: 'Juega con otros niños', ageRange: '24-36 meses', achieved: false },
-];
+function getMilestoneStatus(
+  m: Milestone,
+  ageMonths: number,
+  achievements: Record<string, string>
+): MilestoneStatus {
+  if (achievements[m.id]) return 'achieved';
+  if (ageMonths > m.ageMonthsMax) return 'overdue';
+  return 'upcoming';
+}
 
-export default function DevelopmentScreen() {
-  const activeProfile = useProfileStore((s) => s.activeProfile());
-  if (!activeProfile || activeProfile.type !== 'child') return null;
+// ─── Disclaimer ──────────────────────────────────────────────────────────────
 
-  const total = MOCK_MILESTONES.length;
-  const achieved = MOCK_MILESTONES.filter((m) => m.achieved).length;
-  const overdue = MOCK_MILESTONES.filter((m) => m.overdue && !m.achieved);
-  const categories = (Object.keys(CATEGORY_CONFIG) as Array<keyof typeof CATEGORY_CONFIG>);
+function Disclaimer() {
+  return (
+    <View style={styles.disclaimer}>
+      <Text style={styles.disclaimerText}>
+        ℹ️ Los hitos son indicativos y no sustituyen la evaluación de un profesional sanitario.
+        Cada niño tiene su propio ritmo de desarrollo.
+      </Text>
+    </View>
+  );
+}
+
+// ─── Category progress bar ───────────────────────────────────────────────────
+
+function CategoryRow({
+  category, ageMonths, achievements,
+}: {
+  category: MilestoneCategory;
+  ageMonths: number;
+  achievements: Record<string, string>;
+}) {
+  const cfg      = CATEGORY_CONFIG[category];
+  const relevant = MILESTONES.filter((m) => m.category === category && m.ageMonthsMin <= ageMonths + 12);
+  const done     = relevant.filter((m) => achievements[m.id]).length;
+  const progress = relevant.length > 0 ? done / relevant.length : 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Desarrollo</Text>
-          <Text style={styles.subtitle}>{activeProfile.name}</Text>
-          <View style={styles.progressRow}>
-            <Text style={styles.progressLabel}>{achieved} de {total} hitos alcanzados</Text>
-            <Text style={styles.progressPct}>{Math.round((achieved / total) * 100)}%</Text>
+    <View style={styles.categoryRow}>
+      <View style={styles.categoryLabelRow}>
+        <Text style={styles.categoryEmoji}>{cfg.emoji}</Text>
+        <Text style={[styles.categoryLabel, { color: cfg.color }]}>{cfg.label}</Text>
+        <Text style={styles.categoryCount}>{done}/{relevant.length}</Text>
+      </View>
+      <ProgressBar progress={progress} color={cfg.color} />
+    </View>
+  );
+}
+
+// ─── Overdue alert ────────────────────────────────────────────────────────────
+
+function OverdueAlert({ count }: { count: number }) {
+  if (count === 0) return null;
+  return (
+    <View style={styles.overdueAlert}>
+      <Text style={styles.overdueAlertText}>
+        ⚠️ {count} {count === 1 ? 'hito con retraso' : 'hitos con retraso'} —
+        consulta con tu pediatra si alguno te preocupa.
+      </Text>
+    </View>
+  );
+}
+
+// ─── Resumen tab ─────────────────────────────────────────────────────────────
+
+function ResumenTab({
+  ageMonths, achievements, onTabChange,
+}: {
+  ageMonths: number;
+  achievements: Record<string, string>;
+  onTabChange: (t: number) => void;
+}) {
+  const relevant  = MILESTONES.filter((m) => m.ageMonthsMin <= ageMonths + 12);
+  const done      = relevant.filter((m) => achievements[m.id]).length;
+  const overdueMs = relevant.filter((m) => getMilestoneStatus(m, ageMonths, achievements) === 'overdue');
+  const upcoming  = relevant.filter((m) => getMilestoneStatus(m, ageMonths, achievements) === 'upcoming');
+
+  const categories: MilestoneCategory[] = ['motor','cognitive','language','social','educational'];
+
+  return (
+    <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+      <Disclaimer />
+
+      <Card style={styles.statsCard}>
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statNum, { color: Colors.indigo }]}>{done}</Text>
+            <Text style={styles.statLabel}>Logrados</Text>
           </View>
-          <View style={styles.progressBarContainer}>
-            <ProgressBar progress={achieved / total} color="rgba(255,255,255,0.9)" />
+          <View style={[styles.statDivider]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statNum, { color: Colors.skyBlue }]}>{upcoming.length}</Text>
+            <Text style={styles.statLabel}>Próximos</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statNum, { color: Colors.rose }]}>{overdueMs.length}</Text>
+            <Text style={styles.statLabel}>Vencidos</Text>
           </View>
         </View>
+        <View style={styles.statsProgress}>
+          <ProgressBar
+            progress={relevant.length > 0 ? done / relevant.length : 0}
+            color={Colors.indigo}
+            label="Progreso total"
+            showPercent
+          />
+        </View>
+      </Card>
 
-        <View style={styles.cards}>
-          {/* Overdue alert */}
-          {overdue.length > 0 && (
-            <View style={styles.overdueCard}>
-              <Text style={styles.overdueIcon}>⚠️</Text>
-              <View style={styles.overdueText}>
-                <Text style={styles.overdueTitle}>Hitos pendientes de revisión</Text>
-                {overdue.map((m) => (
-                  <Text key={m.id} style={styles.overdueItem}>· {m.label}</Text>
-                ))}
-              </View>
+      <OverdueAlert count={overdueMs.length} />
+
+      <Card style={styles.sectionCard}>
+        <Text style={[Typography.headingBold, styles.sectionTitle]}>Por categoría</Text>
+        {categories.map((cat) => (
+          <CategoryRow
+            key={cat}
+            category={cat}
+            ageMonths={ageMonths}
+            achievements={achievements}
+          />
+        ))}
+      </Card>
+
+      <View style={styles.quickRow}>
+        <TouchableOpacity style={[styles.quickBtn, { borderColor: Colors.indigo }]} onPress={() => onTabChange(1)}>
+          <Text style={[styles.quickBtnText, { color: Colors.indigo }]}>Ver todos los hitos →</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.quickBtn, { borderColor: Colors.mint }]} onPress={() => onTabChange(2)}>
+          <Text style={[styles.quickBtnText, { color: Colors.mint }]}>Ver logros →</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+}
+
+// ─── Milestone row ────────────────────────────────────────────────────────────
+
+function MilestoneRow({
+  milestone, status, onToggle,
+}: {
+  milestone: Milestone;
+  status: MilestoneStatus;
+  onToggle: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const cfg = CATEGORY_CONFIG[milestone.category];
+
+  const accentColor =
+    status === 'achieved' ? Colors.mint :
+    status === 'overdue'  ? Colors.rose :
+    Colors.skyBlue;
+
+  const statusLabel =
+    status === 'achieved' ? '✓ Logrado' :
+    status === 'overdue'  ? '⚠ Vencido' :
+    '• Pendiente';
+
+  return (
+    <TouchableOpacity onPress={() => setExpanded((e) => !e)} activeOpacity={0.7}>
+      <View style={[styles.milestoneRow, { borderLeftColor: accentColor }]}>
+        <View style={styles.milestoneMain}>
+          <View style={styles.milestoneHeader}>
+            <Text style={styles.milestoneTitle}>{milestone.title}</Text>
+            <Text style={[styles.milestoneStatus, { color: accentColor }]}>{statusLabel}</Text>
+          </View>
+          <View style={styles.milestoneMeta}>
+            <Text style={[styles.milestoneCat, { color: cfg.color }]}>{cfg.emoji} {cfg.label}</Text>
+            <Text style={styles.milestoneAge}>{milestone.ageMonthsMin}-{milestone.ageMonthsMax} meses</Text>
+          </View>
+          {expanded && (
+            <View style={styles.milestoneExpanded}>
+              <Text style={styles.milestoneDesc}>{milestone.description}</Text>
+              <TouchableOpacity
+                style={[
+                  styles.toggleBtn,
+                  { backgroundColor: status === 'achieved' ? '#FEE2E2' : Colors.indigo },
+                ]}
+                onPress={onToggle}
+              >
+                <Text style={[
+                  styles.toggleBtnText,
+                  { color: status === 'achieved' ? Colors.rose : Colors.surface },
+                ]}>
+                  {status === 'achieved' ? 'Marcar como pendiente' : 'Marcar como logrado'}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+}
 
-          {/* Milestones by category */}
-          {categories.map((cat) => {
-            const cfg = CATEGORY_CONFIG[cat];
-            const items = MOCK_MILESTONES.filter((m) => m.category === cat);
-            return (
-              <Card key={cat} style={styles.card}>
-                <View style={styles.catHeader}>
-                  <Text style={styles.catEmoji}>{cfg.emoji}</Text>
-                  <Text style={[styles.catLabel, { color: cfg.color }]}>{cfg.label}</Text>
-                  <Text style={styles.catCount}>
-                    {items.filter((m) => m.achieved).length}/{items.length}
+// ─── Hitos tab ────────────────────────────────────────────────────────────────
+
+type FilterType = 'all' | 'upcoming' | 'overdue';
+
+function HitosTab({
+  ageMonths, achievements, onToggle,
+}: {
+  ageMonths: number;
+  achievements: Record<string, string>;
+  onToggle: (id: string) => void;
+}) {
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [openGroup, setOpenGroup] = useState<string | null>(AGE_GROUPS[0]);
+
+  const filters: { key: FilterType; label: string }[] = [
+    { key: 'all',      label: 'Todos' },
+    { key: 'upcoming', label: 'Pendientes' },
+    { key: 'overdue',  label: 'Vencidos' },
+  ];
+
+  function visibleMilestones(group: string): Milestone[] {
+    const groupMs = MILESTONES.filter((m) => m.ageGroup === group);
+    if (filter === 'all') return groupMs;
+    return groupMs.filter((m) => getMilestoneStatus(m, ageMonths, achievements) === filter);
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+      <View style={styles.filterRow}>
+        {filters.map((f) => (
+          <TouchableOpacity
+            key={f.key}
+            style={[styles.filterChip, filter === f.key && styles.filterChipActive]}
+            onPress={() => setFilter(f.key)}
+          >
+            <Text style={[styles.filterChipText, filter === f.key && styles.filterChipTextActive]}>
+              {f.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {AGE_GROUPS.map((group) => {
+        const ms = visibleMilestones(group);
+        if (ms.length === 0) return null;
+        const isOpen = openGroup === group;
+        return (
+          <Card key={group} style={styles.groupCard}>
+            <TouchableOpacity
+              style={styles.groupHeader}
+              onPress={() => setOpenGroup(isOpen ? null : group)}
+              activeOpacity={0.7}
+            >
+              <Text style={[Typography.headingBold, styles.groupTitle]}>{group}</Text>
+              <Text style={styles.groupCount}>{ms.length} hitos  {isOpen ? '▲' : '▼'}</Text>
+            </TouchableOpacity>
+            {isOpen && ms.map((m) => (
+              <MilestoneRow
+                key={m.id}
+                milestone={m}
+                status={getMilestoneStatus(m, ageMonths, achievements)}
+                onToggle={() => onToggle(m.id)}
+              />
+            ))}
+          </Card>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+// ─── Logros tab ───────────────────────────────────────────────────────────────
+
+function LogrosTab({
+  achievements, onToggle,
+}: {
+  achievements: Record<string, string>;
+  onToggle: (id: string) => void;
+}) {
+  const achievedIds = Object.keys(achievements);
+  const achieved    = MILESTONES.filter((m) => achievedIds.includes(m.id));
+
+  const categories: MilestoneCategory[] = ['motor','cognitive','language','social','educational'];
+
+  if (achieved.length === 0) {
+    return (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyIcon}>🌱</Text>
+        <Text style={styles.emptyTitle}>Aún no hay logros registrados</Text>
+        <Text style={styles.emptySubtitle}>
+          Ve a la pestaña Hitos para marcar los que ya ha alcanzado tu hijo/a.
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+      {categories.map((cat) => {
+        const catMs = achieved.filter((m) => m.category === cat);
+        if (catMs.length === 0) return null;
+        const cfg = CATEGORY_CONFIG[cat];
+        return (
+          <Card key={cat} style={styles.groupCard}>
+            <View style={[styles.groupHeader, { paddingBottom: 4 }]}>
+              <Text style={[Typography.headingBold, { color: cfg.color }]}>
+                {cfg.emoji} {cfg.label}
+              </Text>
+              <Text style={styles.groupCount}>{catMs.length} logros</Text>
+            </View>
+            {catMs.map((m) => (
+              <View key={m.id} style={[styles.achievedRow, { borderLeftColor: cfg.color }]}>
+                <View style={styles.achievedInfo}>
+                  <Text style={styles.achievedTitle}>{m.title}</Text>
+                  <Text style={styles.achievedDate}>
+                    Logrado el {achievements[m.id] ?? ''}
                   </Text>
                 </View>
-                {items.map((milestone) => (
-                  <TouchableOpacity key={milestone.id} style={styles.milestoneRow} activeOpacity={0.7}>
-                    <Text style={styles.milestoneCheck}>
-                      {milestone.achieved ? '✅' : milestone.overdue ? '⚠️' : '⬜'}
-                    </Text>
-                    <View style={styles.milestoneInfo}>
-                      <Text style={[styles.milestoneName, milestone.achieved && styles.textDone]}>
-                        {milestone.label}
-                      </Text>
-                      <Text style={styles.milestoneAge}>{milestone.ageRange}</Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </Card>
-            );
-          })}
+                <TouchableOpacity onPress={() => onToggle(m.id)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={styles.undoBtn}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </Card>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+// ─── Main screen ─────────────────────────────────────────────────────────────
+
+const TABS = ['📊 Resumen', '📅 Hitos', '✅ Logros'];
+
+export default function DevelopmentScreen() {
+  const [activeTab, setActiveTab] = useState(0);
+  const getActiveProfile = useProfileStore((s) => s.activeProfile);
+  const activeProfile  = getActiveProfile();
+  const { toggleMilestone, getAchievements, seedIfEmpty } = useDevelopmentStore();
+
+  useEffect(() => {
+    if (!activeProfile || activeProfile.type !== 'child') return;
+    const mock = activeProfile.id === 'profile-sofia' ? 'sofia' : 'lucas';
+    seedIfEmpty(activeProfile.id, mock);
+  }, [activeProfile?.id]);
+
+  if (!activeProfile || activeProfile.type !== 'child') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>👶</Text>
+          <Text style={styles.emptyTitle}>Selecciona un perfil infantil</Text>
+          <Text style={styles.emptySubtitle}>
+            El módulo de desarrollo está disponible para perfiles de niño/a.
+          </Text>
         </View>
-      </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  const ageMonths  = getAgeMonths(activeProfile.birthDate);
+  const achievements = getAchievements(activeProfile.id);
+  const relevant   = MILESTONES.filter((m) => m.ageMonthsMin <= ageMonths + 12);
+  const done       = relevant.filter((m) => achievements[m.id]).length;
+  const progress   = relevant.length > 0 ? done / relevant.length : 0;
+
+  const handleToggle = useCallback((milestoneId: string) => {
+    toggleMilestone(activeProfile.id, milestoneId);
+  }, [activeProfile.id, toggleMilestone]);
+
+  return (
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <StatusBar barStyle="light-content" />
+
+      <View style={styles.hero}>
+        <Text style={styles.heroLabel}>Desarrollo</Text>
+        <Text style={styles.heroName}>{activeProfile.name}</Text>
+        <Text style={styles.heroAge}>{ageMonths} meses</Text>
+
+        <View style={styles.heroStats}>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatNum}>{done}</Text>
+            <Text style={styles.heroStatLabel}>logros</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatNum}>{relevant.length - done}</Text>
+            <Text style={styles.heroStatLabel}>pendientes</Text>
+          </View>
+          <View style={styles.heroStat}>
+            <Text style={styles.heroStatNum}>{Math.round(progress * 100)}%</Text>
+            <Text style={styles.heroStatLabel}>progreso</Text>
+          </View>
+        </View>
+
+        <View style={styles.heroBar}>
+          <View style={[styles.heroBarFill, { width: `${Math.round(progress * 100)}%` }]} />
+        </View>
+      </View>
+
+      <View style={styles.tabBar}>
+        {TABS.map((label, i) => (
+          <TouchableOpacity
+            key={label}
+            style={[styles.tabItem, activeTab === i && styles.tabItemActive]}
+            onPress={() => setActiveTab(i)}
+          >
+            <Text style={[styles.tabLabel, activeTab === i && styles.tabLabelActive]}>
+              {label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {activeTab === 0 && (
+        <ResumenTab
+          ageMonths={ageMonths}
+          achievements={achievements}
+          onTabChange={setActiveTab}
+        />
+      )}
+      {activeTab === 1 && (
+        <HitosTab
+          ageMonths={ageMonths}
+          achievements={achievements}
+          onToggle={handleToggle}
+        />
+      )}
+      {activeTab === 2 && (
+        <LogrosTab
+          achievements={achievements}
+          onToggle={handleToggle}
+        />
+      )}
     </SafeAreaView>
   );
 }
 
+// ─── styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingBottom: 32 },
-  header: {
-    backgroundColor: Colors.skyBlue,
-    paddingTop: 24,
-    paddingBottom: 32,
+
+  hero: {
+    backgroundColor: Colors.gradients.development[0],
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    marginBottom: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
-  title: { ...Typography.displayBold, color: Colors.surface },
-  subtitle: { ...Typography.bodyMedium, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  progressRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16, marginBottom: 8 },
-  progressLabel: { ...Typography.bodyMedium, color: 'rgba(255,255,255,0.85)' },
-  progressPct: { ...Typography.headingBold, color: Colors.surface },
-  progressBarContainer: { opacity: 0.8 },
-  cards: { paddingHorizontal: 16, gap: 12 },
-  card: { padding: 16 },
-  overdueCard: {
+  heroLabel: { ...Typography.labelUppercase, color: 'rgba(255,255,255,0.75)', marginBottom: 2 },
+  heroName:  { ...Typography.displayBold,   color: Colors.surface, fontSize: 24 },
+  heroAge:   { ...Typography.bodyRegular,   color: 'rgba(255,255,255,0.8)', marginBottom: 12 },
+  heroStats: { flexDirection: 'row', gap: 24, marginBottom: 10 },
+  heroStat:  { alignItems: 'center' },
+  heroStatNum:   { ...Typography.titleBold,  color: Colors.surface, fontSize: 22 },
+  heroStatLabel: { ...Typography.caption,    color: 'rgba(255,255,255,0.8)' },
+  heroBar: {
+    height: 6, backgroundColor: 'rgba(255,255,255,0.3)',
+    borderRadius: 3, overflow: 'hidden',
+  },
+  heroBarFill: {
+    height: 6, backgroundColor: Colors.surface, borderRadius: 3,
+  },
+
+  tabBar: {
     flexDirection: 'row',
-    backgroundColor: `${Colors.amber}15`,
-    borderRadius: 16,
-    padding: 16,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: `${Colors.amber}30`,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
   },
-  overdueIcon: { fontSize: 24 },
-  overdueText: { flex: 1 },
-  overdueTitle: { ...Typography.bodyMedium, fontWeight: '700', color: Colors.amber, marginBottom: 6 },
-  overdueItem: { ...Typography.bodyRegular, marginBottom: 2 },
-  catHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
-  catEmoji: { fontSize: 20 },
-  catLabel: { ...Typography.headingBold, flex: 1 },
-  catCount: { ...Typography.labelUppercase, color: Colors.textSecondary },
-  milestoneRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-  milestoneCheck: { fontSize: 16, width: 24, marginTop: 1 },
-  milestoneInfo: { flex: 1 },
-  milestoneName: { ...Typography.bodyMedium },
-  textDone: { color: Colors.textSecondary, textDecorationLine: 'line-through' },
-  milestoneAge: { ...Typography.caption, marginTop: 2 },
+  tabItem: {
+    flex: 1, paddingVertical: 12, alignItems: 'center',
+    borderBottomWidth: 2, borderBottomColor: 'transparent',
+  },
+  tabItemActive: { borderBottomColor: Colors.indigo },
+  tabLabel:       { ...Typography.bodyMedium, color: Colors.textSecondary },
+  tabLabelActive: { color: Colors.indigo },
+
+  tabContent: { padding: 16, gap: 12, paddingBottom: 32 },
+
+  disclaimer: {
+    backgroundColor: '#EEF2FF',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.indigo,
+  },
+  disclaimerText: { ...Typography.caption, color: Colors.indigo, lineHeight: 18 },
+
+  statsCard: { padding: 16 },
+  statsRow:  { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
+  statItem:  { alignItems: 'center' },
+  statNum:   { ...Typography.displayBold, fontSize: 28 },
+  statLabel: { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+  statDivider: { width: 1, backgroundColor: '#E5E7EB', marginVertical: 4 },
+  statsProgress: { gap: 4 },
+
+  overdueAlert: {
+    backgroundColor: '#FEF3C7',
+    borderRadius: 10,
+    padding: 12,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.amber,
+  },
+  overdueAlertText: { ...Typography.caption, color: '#92400E', lineHeight: 18 },
+
+  sectionCard:  { padding: 16, gap: 12 },
+  sectionTitle: { color: Colors.textPrimary, marginBottom: 4 },
+
+  categoryRow:      { gap: 4 },
+  categoryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  categoryEmoji:    { fontSize: 14 },
+  categoryLabel:    { ...Typography.bodyMedium, flex: 1 },
+  categoryCount:    { ...Typography.caption, color: Colors.textSecondary },
+
+  quickRow: { flexDirection: 'row', gap: 10 },
+  quickBtn: {
+    flex: 1, paddingVertical: 10, borderRadius: 10,
+    borderWidth: 1.5, alignItems: 'center',
+  },
+  quickBtnText: { ...Typography.bodyMedium },
+
+  groupCard:   { padding: 0, overflow: 'hidden' },
+  groupHeader: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    padding: 14, backgroundColor: Colors.surface,
+  },
+  groupTitle: { color: Colors.textPrimary },
+  groupCount: { ...Typography.caption, color: Colors.textSecondary },
+
+  milestoneRow: {
+    flexDirection: 'row', borderLeftWidth: 3,
+    marginHorizontal: 12, marginBottom: 8,
+    backgroundColor: '#F9FAFB', borderRadius: 8,
+  },
+  milestoneMain:   { flex: 1, padding: 10 },
+  milestoneHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  milestoneTitle:  { ...Typography.bodyMedium, color: Colors.textPrimary, flex: 1, marginRight: 8 },
+  milestoneStatus: { ...Typography.caption, fontWeight: '600' },
+  milestoneMeta:   { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  milestoneCat:    { ...Typography.caption },
+  milestoneAge:    { ...Typography.caption, color: Colors.textSecondary },
+  milestoneExpanded: { marginTop: 8, gap: 8 },
+  milestoneDesc:   { ...Typography.bodyRegular, color: Colors.textSecondary, lineHeight: 20 },
+  toggleBtn: {
+    paddingVertical: 8, paddingHorizontal: 14,
+    borderRadius: 8, alignSelf: 'flex-start',
+  },
+  toggleBtnText: { ...Typography.bodyMedium },
+
+  filterRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  filterChip: {
+    paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20,
+    backgroundColor: Colors.surface, borderWidth: 1, borderColor: '#E5E7EB',
+  },
+  filterChipActive: { backgroundColor: Colors.indigo, borderColor: Colors.indigo },
+  filterChipText:      { ...Typography.bodyRegular, color: Colors.textSecondary },
+  filterChipTextActive: { color: Colors.surface, fontWeight: '600' },
+
+  achievedRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderLeftWidth: 3, marginHorizontal: 12, marginBottom: 8,
+    backgroundColor: '#F0FDF4', borderRadius: 8, padding: 10,
+  },
+  achievedInfo:  { flex: 1 },
+  achievedTitle: { ...Typography.bodyMedium, color: Colors.textPrimary },
+  achievedDate:  { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
+  undoBtn: { ...Typography.bodyMedium, color: Colors.rose, paddingLeft: 8 },
+
+  emptyState: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32,
+  },
+  emptyIcon:     { fontSize: 56, marginBottom: 16 },
+  emptyTitle:    { ...Typography.headingBold, color: Colors.textPrimary, textAlign: 'center', marginBottom: 8 },
+  emptySubtitle: { ...Typography.bodyRegular, color: Colors.textSecondary, textAlign: 'center', lineHeight: 22 },
 });

@@ -763,6 +763,9 @@ export default function NutritionScreen() {
   const activeProfile = useProfileStore((s) => s.activeProfile());
   const [section, setSection] = useState<Section>('alimentos');
   const seedIfEmpty = useNutritionStore((s) => s.seedIfEmpty);
+  // Reactive selectors hoisted above early-return guard
+  const diaryEntries = useNutritionStore((s) => s.getDiaryEntries(activeProfile?.id ?? ''));
+  const foodIntros   = useNutritionStore((s) => s.getFoodIntroductions(activeProfile?.id ?? ''));
 
   useEffect(() => {
     if (!activeProfile || activeProfile.type !== 'child') return;
@@ -777,10 +780,8 @@ export default function NutritionScreen() {
   const profile = activeProfile as ChildProfile;
 
   const reactionCount =
-    useNutritionStore.getState().getDiaryEntries(profile.id).filter((e) => e.hadReaction).length +
-    FOOD_CHECKLIST.filter(
-      (f) => useNutritionStore.getState().getFoodIntroductions(profile.id)[f.id]?.status === 'reaction'
-    ).length;
+    diaryEntries.filter((e) => e.hadReaction).length +
+    FOOD_CHECKLIST.filter((f) => foodIntros[f.id]?.status === 'reaction').length;
 
   return (
     <AppScreen edges={['bottom']} statusBarStyle="light-content">

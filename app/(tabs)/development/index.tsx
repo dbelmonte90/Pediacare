@@ -363,8 +363,7 @@ const TAB_SEGMENTS = [
 
 export default function DevelopmentScreen() {
   const [activeTab, setActiveTab] = useState(0);
-  const getActiveProfile = useProfileStore((s) => s.activeProfile);
-  const activeProfile  = getActiveProfile();
+  const activeProfile = useProfileStore((s) => s.activeProfile());
   const { toggleMilestone, getAchievements, seedIfEmpty } = useDevelopmentStore();
 
   useEffect(() => {

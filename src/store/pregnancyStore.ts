@@ -10,6 +10,7 @@ interface PregnancyState {
   checklist: Record<string, Record<string, boolean>>;
   // weight: profileId → entries[]
   weightEntries: Record<string, WeightEntry[]>;
+  _hasHydrated: boolean;
 }
 
 interface PregnancyActions {
@@ -26,6 +27,7 @@ export const usePregnancyStore = create<PregnancyState & PregnancyActions>()(
     immer((set, get) => ({
       checklist: {},
       weightEntries: {},
+      _hasHydrated: false,
 
       toggleChecklistItem(profileId, itemId) {
         set((state) => {
@@ -85,6 +87,14 @@ export const usePregnancyStore = create<PregnancyState & PregnancyActions>()(
     {
       name: 'pregnancy-store',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        checklist:     state.checklist,
+        weightEntries: state.weightEntries,
+      }),
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) console.warn('[pregnancyStore] hydration error', error);
+        usePregnancyStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

@@ -6,6 +6,7 @@ import { MOCK_ACHIEVEMENTS_SOFIA, MOCK_ACHIEVEMENTS_LUCAS } from '@/shared/const
 
 interface DevState {
   achievements: Record<string, Record<string, string>>; // profileId → milestoneId → achievedDate
+  _hasHydrated: boolean;
 }
 
 interface DevActions {
@@ -19,6 +20,7 @@ export const useDevelopmentStore = create<DevState & DevActions>()(
   persist(
     immer((set, get) => ({
       achievements: {},
+      _hasHydrated: false,
 
       toggleMilestone(profileId, milestoneId) {
         set((state) => {
@@ -51,6 +53,13 @@ export const useDevelopmentStore = create<DevState & DevActions>()(
     {
       name: 'development-store',
       storage: createJSONStorage(() => AsyncStorage),
+      partialize: (state) => ({
+        achievements: state.achievements,
+      }),
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) console.warn('[developmentStore] hydration error', error);
+        useDevelopmentStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

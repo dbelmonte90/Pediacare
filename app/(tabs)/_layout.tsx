@@ -17,7 +17,7 @@ interface TabIconProps {
 function TabIcon({ emoji, label, focused, color }: TabIconProps) {
   return (
     <View style={[styles.tabItem, focused && { backgroundColor: `${color}18` }]}>
-      <Text style={styles.emoji}>{emoji}</Text>
+      <Text style={[styles.emoji, focused && styles.emojiFocused]}>{emoji}</Text>
       <Text style={[styles.tabLabel, focused && { color, fontWeight: '700' }]}>{label}</Text>
       {focused && <View style={[styles.accent, { backgroundColor: color }]} />}
     </View>
@@ -33,7 +33,7 @@ export default function TabsLayout() {
   // Redirect to the correct home tab whenever the profile type changes
   const prevIsPregnancy = useRef<boolean | null>(null);
   useEffect(() => {
-    // Skip the very first render — no profile switch happened yet
+    // Skip the very first render (no profile switch happened)
     if (prevIsPregnancy.current === null) {
       prevIsPregnancy.current = isPregnancy;
       return;
@@ -54,7 +54,7 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: `${Colors.surface}EE`,
           borderTopColor: Colors.border,
-          height: 60 + insets.bottom,
+          height: 64 + insets.bottom,
           paddingBottom: insets.bottom,
         },
         tabBarShowLabel: false,
@@ -134,6 +134,7 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   emoji: { fontSize: 20 },
+  emojiFocused: { transform: [{ scale: 1.1 }] },
   tabLabel: {
     ...Typography.caption,
     color: Colors.textSecondary,

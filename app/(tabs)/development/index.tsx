@@ -7,6 +7,8 @@ import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
 import { Card } from '@/shared/ui/Card';
 import { ProgressBar } from '@/shared/ui/ProgressBar';
+import { AppHeader } from '@/shared/ui/AppHeader';
+import { SegmentedControl } from '@/shared/ui/SegmentedControl';
 import { useProfileStore } from '@/store/profileStore';
 import { useDevelopmentStore } from '@/store/developmentStore';
 import { MILESTONES, AGE_GROUPS, CATEGORY_CONFIG } from '@/shared/constants/developmentData';
@@ -105,6 +107,7 @@ function ResumenTab({
     <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
       <Disclaimer />
 
+      {/* Stats row */}
       <Card style={styles.statsCard}>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
@@ -134,6 +137,7 @@ function ResumenTab({
 
       <OverdueAlert count={overdueMs.length} />
 
+      {/* Per-category bars */}
       <Card style={styles.sectionCard}>
         <Text style={[Typography.headingBold, styles.sectionTitle]}>Por categoría</Text>
         {categories.map((cat) => (
@@ -146,6 +150,7 @@ function ResumenTab({
         ))}
       </Card>
 
+      {/* Quick actions */}
       <View style={styles.quickRow}>
         <TouchableOpacity style={[styles.quickBtn, { borderColor: Colors.indigo }]} onPress={() => onTabChange(1)}>
           <Text style={[styles.quickBtnText, { color: Colors.indigo }]}>Ver todos los hitos →</Text>
@@ -245,6 +250,7 @@ function HitosTab({
 
   return (
     <ScrollView contentContainerStyle={styles.tabContent} showsVerticalScrollIndicator={false}>
+      {/* Filter chips */}
       <View style={styles.filterRow}>
         {filters.map((f) => (
           <TouchableOpacity
@@ -349,7 +355,11 @@ function LogrosTab({
 
 // ─── Main screen ─────────────────────────────────────────────────────────────
 
-const TABS = ['📊 Resumen', '📅 Hitos', '✅ Logros'];
+const TAB_SEGMENTS = [
+  { key: '0', label: '📊 Resumen' },
+  { key: '1', label: '📅 Hitos' },
+  { key: '2', label: '✅ Logros' },
+];
 
 export default function DevelopmentScreen() {
   const [activeTab, setActiveTab] = useState(0);
@@ -391,11 +401,13 @@ export default function DevelopmentScreen() {
     <SafeAreaView style={styles.safe} edges={['top']}>
       <StatusBar barStyle="light-content" />
 
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>Desarrollo</Text>
-        <Text style={styles.heroName}>{activeProfile.name}</Text>
-        <Text style={styles.heroAge}>{ageMonths} meses</Text>
-
+      <AppHeader
+        section="development"
+        title="Desarrollo"
+        subtitle={activeProfile.name}
+        style={{ marginBottom: 0 }}
+      >
+        {/* Stats row */}
         <View style={styles.heroStats}>
           <View style={styles.heroStat}>
             <Text style={styles.heroStatNum}>{done}</Text>
@@ -410,26 +422,20 @@ export default function DevelopmentScreen() {
             <Text style={styles.heroStatLabel}>progreso</Text>
           </View>
         </View>
-
+        {/* Progress bar */}
         <View style={styles.heroBar}>
-          <View style={[styles.heroBarFill, { width: `${Math.round(progress * 100)}%` }]} />
+          <View style={[styles.heroBarFill, { width: `${Math.round(progress * 100)}%` as any }]} />
         </View>
-      </View>
+      </AppHeader>
 
-      <View style={styles.tabBar}>
-        {TABS.map((label, i) => (
-          <TouchableOpacity
-            key={label}
-            style={[styles.tabItem, activeTab === i && styles.tabItemActive]}
-            onPress={() => setActiveTab(i)}
-          >
-            <Text style={[styles.tabLabel, activeTab === i && styles.tabLabelActive]}>
-              {label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <SegmentedControl
+        segments={TAB_SEGMENTS}
+        value={String(activeTab)}
+        onChange={(k) => setActiveTab(Number(k))}
+        activeColor={Colors.indigo}
+      />
 
+      {/* Content */}
       {activeTab === 0 && (
         <ResumenTab
           ageMonths={ageMonths}
@@ -459,16 +465,8 @@ export default function DevelopmentScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
 
-  hero: {
-    backgroundColor: Colors.gradients.development[0],
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 20,
-  },
-  heroLabel: { ...Typography.labelUppercase, color: 'rgba(255,255,255,0.75)', marginBottom: 2 },
-  heroName:  { ...Typography.displayBold,   color: Colors.surface, fontSize: 24 },
-  heroAge:   { ...Typography.bodyRegular,   color: 'rgba(255,255,255,0.8)', marginBottom: 12 },
-  heroStats: { flexDirection: 'row', gap: 24, marginBottom: 10 },
+  // Hero children
+  heroStats: { flexDirection: 'row', gap: 24, marginBottom: 10, marginTop: 8 },
   heroStat:  { alignItems: 'center' },
   heroStatNum:   { ...Typography.titleBold,  color: Colors.surface, fontSize: 22 },
   heroStatLabel: { ...Typography.caption,    color: 'rgba(255,255,255,0.8)' },
@@ -480,22 +478,10 @@ const styles = StyleSheet.create({
     height: 6, backgroundColor: Colors.surface, borderRadius: 3,
   },
 
-  tabBar: {
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  tabItem: {
-    flex: 1, paddingVertical: 12, alignItems: 'center',
-    borderBottomWidth: 2, borderBottomColor: 'transparent',
-  },
-  tabItemActive: { borderBottomColor: Colors.indigo },
-  tabLabel:       { ...Typography.bodyMedium, color: Colors.textSecondary },
-  tabLabelActive: { color: Colors.indigo },
-
+  // Tab content
   tabContent: { padding: 16, gap: 12, paddingBottom: 32 },
 
+  // Disclaimer
   disclaimer: {
     backgroundColor: '#EEF2FF',
     borderRadius: 10,
@@ -505,6 +491,7 @@ const styles = StyleSheet.create({
   },
   disclaimerText: { ...Typography.caption, color: Colors.indigo, lineHeight: 18 },
 
+  // Stats card
   statsCard: { padding: 16 },
   statsRow:  { flexDirection: 'row', justifyContent: 'space-around', marginBottom: 16 },
   statItem:  { alignItems: 'center' },
@@ -513,6 +500,7 @@ const styles = StyleSheet.create({
   statDivider: { width: 1, backgroundColor: '#E5E7EB', marginVertical: 4 },
   statsProgress: { gap: 4 },
 
+  // Overdue alert
   overdueAlert: {
     backgroundColor: '#FEF3C7',
     borderRadius: 10,
@@ -522,15 +510,18 @@ const styles = StyleSheet.create({
   },
   overdueAlertText: { ...Typography.caption, color: '#92400E', lineHeight: 18 },
 
+  // Section card
   sectionCard:  { padding: 16, gap: 12 },
   sectionTitle: { color: Colors.textPrimary, marginBottom: 4 },
 
+  // Category row
   categoryRow:      { gap: 4 },
   categoryLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   categoryEmoji:    { fontSize: 14 },
   categoryLabel:    { ...Typography.bodyMedium, flex: 1 },
   categoryCount:    { ...Typography.caption, color: Colors.textSecondary },
 
+  // Quick buttons
   quickRow: { flexDirection: 'row', gap: 10 },
   quickBtn: {
     flex: 1, paddingVertical: 10, borderRadius: 10,
@@ -538,6 +529,7 @@ const styles = StyleSheet.create({
   },
   quickBtnText: { ...Typography.bodyMedium },
 
+  // Group card (Hitos)
   groupCard:   { padding: 0, overflow: 'hidden' },
   groupHeader: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
@@ -546,6 +538,7 @@ const styles = StyleSheet.create({
   groupTitle: { color: Colors.textPrimary },
   groupCount: { ...Typography.caption, color: Colors.textSecondary },
 
+  // Milestone row
   milestoneRow: {
     flexDirection: 'row', borderLeftWidth: 3,
     marginHorizontal: 12, marginBottom: 8,
@@ -566,6 +559,7 @@ const styles = StyleSheet.create({
   },
   toggleBtnText: { ...Typography.bodyMedium },
 
+  // Filter row (Hitos)
   filterRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   filterChip: {
     paddingVertical: 6, paddingHorizontal: 14, borderRadius: 20,
@@ -575,6 +569,7 @@ const styles = StyleSheet.create({
   filterChipText:      { ...Typography.bodyRegular, color: Colors.textSecondary },
   filterChipTextActive: { color: Colors.surface, fontWeight: '600' },
 
+  // Logros
   achievedRow: {
     flexDirection: 'row', alignItems: 'center',
     borderLeftWidth: 3, marginHorizontal: 12, marginBottom: 8,
@@ -585,6 +580,7 @@ const styles = StyleSheet.create({
   achievedDate:  { ...Typography.caption, color: Colors.textSecondary, marginTop: 2 },
   undoBtn: { ...Typography.bodyMedium, color: Colors.rose, paddingLeft: 8 },
 
+  // Empty state
   emptyState: {
     flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32,
   },

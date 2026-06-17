@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import {
   ScrollView, View, Text, StyleSheet, TouchableOpacity, StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AppScreen } from '@/shared/ui/AppScreen';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
@@ -564,57 +564,47 @@ export default function HomeScreen() {
   const ageMonths = getAgeInMonths(child);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom']}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        showsVerticalScrollIndicator={false}
-      >
-        <ProfileHero child={child} ageMonths={ageMonths} />
+    <AppScreen edges={['bottom']} statusBarStyle="light-content" paddingBottom={40}>
+      <ProfileHero child={child} ageMonths={ageMonths} />
 
-        {/* quick actions */}
-        <View style={styles.section}>
-          <SectionHeader title="Acciones rápidas" />
-          <QuickActions profileId={activeProfile.id} />
-        </View>
+      {/* quick actions */}
+      <View style={styles.section}>
+        <SectionHeader title="Acciones rápidas" />
+        <QuickActions profileId={activeProfile.id} />
+      </View>
 
-        {/* health */}
-        <View style={styles.section}>
-          <SectionHeader title="Salud" onPress={undefined} />
-          <HealthCard profileId={activeProfile.id} ageMonths={ageMonths} />
-        </View>
+      {/* health */}
+      <View style={styles.section}>
+        <SectionHeader title="Salud" onPress={undefined} />
+        <HealthCard profileId={activeProfile.id} ageMonths={ageMonths} />
+      </View>
 
-        {/* nutrition */}
-        <View style={styles.section}>
-          <SectionHeader title="Nutrición" onPress={undefined} />
-          <NutritionCard profileId={activeProfile.id} ageMonths={ageMonths} />
-        </View>
+      {/* nutrition */}
+      <View style={styles.section}>
+        <SectionHeader title="Nutrición" onPress={undefined} />
+        <NutritionCard profileId={activeProfile.id} ageMonths={ageMonths} />
+      </View>
 
-        {/* development */}
-        <View style={styles.section}>
-          <SectionHeader title="Desarrollo" onPress={undefined} />
-          <DevelopmentCard profileId={activeProfile.id} ageMonths={ageMonths} />
-        </View>
+      {/* development */}
+      <View style={styles.section}>
+        <SectionHeader title="Desarrollo" onPress={undefined} />
+        <DevelopmentCard profileId={activeProfile.id} ageMonths={ageMonths} />
+      </View>
 
-        {/* medical badge */}
-        <View style={[styles.section, { marginBottom: 8 }]}>
-          <MedicalBadge />
-        </View>
-
-      </ScrollView>
-    </SafeAreaView>
+      {/* medical badge */}
+      <View style={[styles.section, { marginBottom: 8 }]}>
+        <MedicalBadge />
+      </View>
+    </AppScreen>
   );
 }
 
 // ─── styles ───────────────────────────────────────────────────────────────────
 
-const HERO_COLOR_START = Colors.gradients.home[0]; // #8B5CF6
-const HERO_COLOR_END   = Colors.gradients.home[1]; // #6366f1
+const HERO_COLOR_START = Colors.gradients.home[0];
+const HERO_COLOR_END   = Colors.gradients.home[1];
 
 const styles = StyleSheet.create({
-  safe:   { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingBottom: 40 },
-
   // ── Hero ──────────────────────────────────────────────────────────────────
   hero: {
     borderBottomLeftRadius: 32,

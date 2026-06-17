@@ -4,9 +4,12 @@ import {
   Modal, Pressable, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'react-native';
 import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
 import { Card } from '@/shared/ui/Card';
+import { AppHeader } from '@/shared/ui/AppHeader';
+import { SegmentedControl } from '@/shared/ui/SegmentedControl';
 import { useProfileStore } from '@/store/profileStore';
 import { usePregnancyStore } from '@/store/pregnancyStore';
 import {
@@ -273,7 +276,7 @@ function ChecklistSection({ profileId }: { profileId: string }) {
               <View
                 style={[
                   checkStyles.progressFill,
-                  { width: `${(doneCount / catItems.length) * 100}%` },
+                  { width: `${(doneCount / catItems.length) * 100}%` as any },
                   allDone && checkStyles.progressFillDone,
                 ]}
               />
@@ -447,13 +450,23 @@ const secStyles = StyleSheet.create({
   },
 });
 
+// ─── Nav segments ─────────────────────────────────────────────────────────────
+
+const NAV_SEGMENTS = [
+  { key: 'checklist', label: '✅ Checklist' },
+  { key: 'symptoms',  label: '💬 Síntomas' },
+  { key: 'faq',       label: '❓ FAQ' },
+] as const;
+
+type NavSection = typeof NAV_SEGMENTS[number]['key'];
+
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function PregnancyScreen() {
   const activeProfile = useProfileStore((s) => s.activeProfile());
   const [symptomTrimester, setSymptomTrimester] = useState<1 | 2 | 3>(1);
   const [weightModalOpen, setWeightModalOpen] = useState(false);
-  const [activeSection, setActiveSection] = useState<'checklist' | 'symptoms' | 'faq'>('checklist');
+  const [activeSection, setActiveSection] = useState<NavSection>('checklist');
 
   const seedWeightIfEmpty = usePregnancyStore((s) => s.seedWeightIfEmpty);
   const addWeightEntry = usePregnancyStore((s) => s.addWeightEntry);
@@ -484,22 +497,17 @@ export default function PregnancyScreen() {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  const NAV_SECTIONS = [
-    { key: 'checklist', label: 'Checklist', emoji: '✅' },
-    { key: 'symptoms', label: 'Síntomas', emoji: '💬' },
-    { key: 'faq', label: 'FAQ', emoji: '❓' },
-  ] as const;
-
   return (
     <SafeAreaView style={styles.safe} edges={['bottom']}>
+      <StatusBar barStyle="light-content" />
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
 
-        {/* ── Hero ── */}
-        <View style={styles.hero}>
-          <Text style={styles.trimesterBadge}>{TRIMESTER_LABELS[trimester]}</Text>
-          <Text style={styles.weekNumber}>{week}</Text>
-          <Text style={styles.weekLabel}>semanas de embarazo</Text>
-
+        {/* ── Hero via AppHeader ── */}
+        <AppHeader
+          section="pregnancy"
+          title={`Semana ${week}`}
+          subtitle={TRIMESTER_LABELS[trimester]}
+        >
           <WeekDots week={week} />
 
           <View style={styles.progressRow}>
@@ -507,7 +515,7 @@ export default function PregnancyScreen() {
             <Text style={styles.progressText}>{Math.round(progress * 100)}%</Text>
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+            <View style={[styles.progressFill, { width: `${progress * 100}%` as any }]} />
           </View>
 
           {/* Stats row */}
@@ -527,7 +535,7 @@ export default function PregnancyScreen() {
               <Text style={styles.statLabel}>peso bebé</Text>
             </View>
           </View>
-        </View>
+        </AppHeader>
 
         {/* ── Cards row: Baby size + Countdown ── */}
         <View style={styles.cards}>
@@ -589,22 +597,12 @@ export default function PregnancyScreen() {
         </View>
 
         {/* ── Section navigator ── */}
-        <View style={styles.section}>
-          <View style={styles.navTabs}>
-            {NAV_SECTIONS.map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                style={[styles.navTab, activeSection === s.key && styles.navTabActive]}
-                onPress={() => setActiveSection(s.key)}
-              >
-                <Text style={styles.navTabEmoji}>{s.emoji}</Text>
-                <Text style={[styles.navTabLabel, activeSection === s.key && styles.navTabLabelActive]}>
-                  {s.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        <SegmentedControl
+          segments={NAV_SEGMENTS as unknown as { key: string; label: string }[]}
+          value={activeSection}
+          onChange={(k) => setActiveSection(k as NavSection)}
+          activeColor={Colors.lavender}
+        />
 
         {/* ── Checklist ── */}
         {activeSection === 'checklist' && (
@@ -682,40 +680,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   scroll: { paddingBottom: 32 },
 
-  // Hero
-  hero: {
-    backgroundColor: Colors.gradients.pregnancy[0],
-    paddingTop: 28,
-    paddingBottom: 28,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    marginBottom: 16,
-    alignItems: 'center',
-  },
-  trimesterBadge: {
-    ...Typography.labelUppercase,
-    color: 'rgba(255,255,255,0.75)',
-    marginBottom: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  weekNumber: {
-    fontSize: 88,
-    fontWeight: '900',
-    letterSpacing: -4,
-    color: '#FFFFFF',
-    lineHeight: 92,
-    marginTop: 4,
-  },
-  weekLabel: {
-    ...Typography.headingBold,
-    color: 'rgba(255,255,255,0.8)',
-    marginBottom: 4,
-  },
+  // Hero children
   progressRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -794,22 +759,6 @@ const styles = StyleSheet.create({
     ...Typography.caption, textAlign: 'center', marginTop: 12,
     color: Colors.textSecondary, fontStyle: 'italic',
   },
-
-  // Nav tabs
-  navTabs: {
-    flexDirection: 'row', backgroundColor: Colors.surface,
-    borderRadius: 16, padding: 4, gap: 4,
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1, shadowRadius: 8, elevation: 3,
-  },
-  navTab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 6, paddingVertical: 10, borderRadius: 12,
-  },
-  navTabActive: { backgroundColor: Colors.lavender },
-  navTabEmoji: { fontSize: 16 },
-  navTabLabel: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
-  navTabLabelActive: { color: '#fff' },
 
   // Trimester tabs (symptoms)
   trimesterTabs: { flexDirection: 'row', gap: 8 },

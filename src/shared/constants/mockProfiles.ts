@@ -21,6 +21,7 @@ export const MOCK_PROFILES: Profile[] = [
     birthDate: '2023-03-15',
     sex: 'female',
     bloodType: 'A+',
+    allergies: ['Huevo', 'Látex'],
   },
   {
     id: 'profile-lucas',
@@ -31,5 +32,6 @@ export const MOCK_PROFILES: Profile[] = [
     birthDate: '2021-07-22',
     sex: 'male',
     bloodType: 'O+',
+    allergies: [],
   },
 ];

@@ -1,6 +1,7 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { View, Text, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useEffect, useRef } from 'react';
 import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
 import { useProfileStore } from '@/store/profileStore';
@@ -25,8 +26,23 @@ function TabIcon({ emoji, label, focused, color }: TabIconProps) {
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const activeProfile = useProfileStore((s) => s.activeProfile());
   const isPregnancy = activeProfile?.type === 'pregnancy';
+
+  // Redirect to the correct home tab whenever the profile type changes
+  const prevIsPregnancy = useRef<boolean | null>(null);
+  useEffect(() => {
+    // Skip the very first render — no profile switch happened yet
+    if (prevIsPregnancy.current === null) {
+      prevIsPregnancy.current = isPregnancy;
+      return;
+    }
+    if (prevIsPregnancy.current === isPregnancy) return;
+
+    prevIsPregnancy.current = isPregnancy;
+    router.replace(isPregnancy ? '/pregnancy' : '/');
+  }, [isPregnancy]);
 
   return (
     <Tabs
@@ -44,7 +60,7 @@ export default function TabsLayout() {
         tabBarShowLabel: false,
       }}
     >
-      {/* Home tab — child profiles only */}
+      {/* Home — child profiles only */}
       <Tabs.Screen
         name="index"
         options={{
@@ -56,7 +72,7 @@ export default function TabsLayout() {
         }}
       />
 
-      {/* Pregnancy tab — pregnancy profiles only */}
+      {/* Pregnancy — pregnancy profiles only */}
       <Tabs.Screen
         name="pregnancy/index"
         options={{

@@ -17,7 +17,7 @@ import { Shadows } from '@/shared/theme/shadows';
 import { useProfileStore } from '@/store/profileStore';
 import type { Profile, PregnancyProfile, ChildProfile } from '@/entities/profile/model/types';
 
-// ─── types ───────────────────────────────────────────────────────────────────
+// ─── types ────────────────────────────────────────────────────────────────────
 
 type Step = 1 | 2;
 type ProfileType = 'pregnancy' | 'child';
@@ -44,6 +44,7 @@ function isoFromMask(masked: string): string {
 }
 
 const BLOOD_TYPES = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−'];
+const COMMON_ALLERGENS = ['Huevo', 'Leche', 'Gluten', 'Frutos secos', 'Mariscos', 'Látex'];
 
 // ─── sub-components ───────────────────────────────────────────────────────────
 
@@ -87,19 +88,17 @@ function DateField({
   value,
   onChange,
   error,
-  placeholder,
 }: {
   label: string;
   value: string;
   onChange: (masked: string) => void;
   error?: string;
-  placeholder?: string;
 }) {
   return (
     <Field label={label} error={error}>
       <TextInput
         style={[styles.input, error ? styles.inputError : null]}
-        placeholder={placeholder ?? 'DD/MM/AAAA'}
+        placeholder="DD/MM/AAAA"
         placeholderTextColor={Colors.textSecondary}
         value={value}
         onChangeText={(raw) => onChange(maskDate(raw))}
@@ -118,19 +117,17 @@ function BloodTypeSelector({
   onSelect: (t: string) => void;
 }) {
   return (
-    <View style={styles.bloodGrid}>
+    <View style={styles.chipGrid}>
       {BLOOD_TYPES.map((bt) => {
         const active = value === bt;
         return (
           <TouchableOpacity
             key={bt}
-            style={[styles.bloodChip, active && styles.bloodChipActive]}
-            onPress={() => onSelect(bt)}
+            style={[styles.chip, active && styles.chipActiveBlood]}
+            onPress={() => onSelect(active ? '' : bt)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.bloodChipText, active && styles.bloodChipTextActive]}>
-              {bt}
-            </Text>
+            <Text style={[styles.chipText, active && styles.chipTextActiveBlood]}>{bt}</Text>
           </TouchableOpacity>
         );
       })}
@@ -159,12 +156,96 @@ function SexSelector({ value, onChange }: { value: Sex; onChange: (s: Sex) => vo
           >
             <Text style={styles.sexEmoji}>{opt.emoji}</Text>
             <Text style={[styles.sexLabel, active && { color: opt.color }]}>{opt.label}</Text>
-            {active && <View style={[styles.sexCheck, { backgroundColor: opt.color }]}>
-              <Text style={styles.sexCheckMark}>✓</Text>
-            </View>}
+            {active && (
+              <View style={[styles.sexCheck, { backgroundColor: opt.color }]}>
+                <Text style={styles.sexCheckMark}>✓</Text>
+              </View>
+            )}
           </TouchableOpacity>
         );
       })}
+    </View>
+  );
+}
+
+function AllergyInput({
+  values,
+  onChange,
+}: {
+  values: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [inputText, setInputText] = useState('');
+
+  const add = (raw: string) => {
+    const trimmed = raw.trim();
+    if (!trimmed) return;
+    const capitalised = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
+    if (values.includes(capitalised)) { setInputText(''); return; }
+    onChange([...values, capitalised]);
+    setInputText('');
+  };
+
+  const remove = (v: string) => onChange(values.filter((a) => a !== v));
+
+  const quickAvailable = COMMON_ALLERGENS.filter((q) => !values.includes(q));
+
+  return (
+    <View style={styles.allergyWrapper}>
+      {values.length > 0 && (
+        <View style={styles.tagList}>
+          {values.map((a) => (
+            <TouchableOpacity
+              key={a}
+              style={styles.allergyTag}
+              onPress={() => remove(a)}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.allergyTagText}>{a}</Text>
+              <Text style={styles.allergyTagRemove}>×</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.allergyInputRow}>
+        <TextInput
+          style={styles.allergyInput}
+          placeholder="Escribe una alergia..."
+          placeholderTextColor={Colors.textSecondary}
+          value={inputText}
+          onChangeText={setInputText}
+          onSubmitEditing={() => add(inputText)}
+          returnKeyType="done"
+          autoCapitalize="words"
+        />
+        <TouchableOpacity
+          style={[styles.allergyAddBtn, !inputText.trim() && styles.allergyAddBtnDisabled]}
+          onPress={() => add(inputText)}
+          disabled={!inputText.trim()}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.allergyAddBtnText}>Añadir</Text>
+        </TouchableOpacity>
+      </View>
+
+      {quickAvailable.length > 0 && (
+        <View style={styles.quickSection}>
+          <Text style={styles.quickLabel}>ALERGIAS COMUNES</Text>
+          <View style={styles.chipGrid}>
+            {quickAvailable.map((q) => (
+              <TouchableOpacity
+                key={q}
+                style={styles.quickChip}
+                onPress={() => add(q)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.quickChipText}>+ {q}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -182,13 +263,13 @@ function ProfilePreview({
   color: string;
   typeEmoji: string;
 }) {
-  if (!name) return null;
+  if (!name.trim()) return null;
   return (
     <View style={styles.previewCard}>
-      <Text style={styles.previewLabel}>VISTA PREVIA</Text>
+      <Text style={styles.fieldLabel}>VISTA PREVIA</Text>
       <View style={styles.previewRow}>
         <View style={[styles.previewAvatar, { backgroundColor: color }]}>
-          <Text style={styles.previewAvatarLetter}>{name[0]?.toUpperCase()}</Text>
+          <Text style={styles.previewLetter}>{name[0].toUpperCase()}</Text>
           <View style={styles.previewBadge}>
             <Text style={styles.previewBadgeEmoji}>{typeEmoji}</Text>
           </View>
@@ -204,7 +285,7 @@ function ProfilePreview({
   );
 }
 
-// ─── main component ───────────────────────────────────────────────────────────
+// ─── main screen ──────────────────────────────────────────────────────────────
 
 export default function AddProfileModal() {
   const router = useRouter();
@@ -222,6 +303,7 @@ export default function AddProfileModal() {
   const [birthDateMasked, setBirthDateMasked] = useState('');
   const [sex, setSex] = useState<Sex>('female');
   const [childBloodType, setChildBloodType] = useState('');
+  const [allergies, setAllergies] = useState<string[]>([]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -235,11 +317,11 @@ export default function AddProfileModal() {
     const next: Record<string, string> = {};
     if (profileType === 'pregnancy') {
       if (!motherName.trim()) next.motherName = 'El nombre es obligatorio';
-      if (!isoFromMask(furMasked)) next.fur = 'Introduce una fecha válida (DD/MM/AAAA)';
-      if (!isoFromMask(fppMasked)) next.fpp = 'Introduce una fecha válida (DD/MM/AAAA)';
+      if (!isoFromMask(furMasked)) next.fur = 'Fecha no válida — usa DD/MM/AAAA';
+      if (!isoFromMask(fppMasked)) next.fpp = 'Fecha no válida — usa DD/MM/AAAA';
     } else {
       if (!childName.trim()) next.childName = 'El nombre es obligatorio';
-      if (!isoFromMask(birthDateMasked)) next.birthDate = 'Introduce una fecha válida (DD/MM/AAAA)';
+      if (!isoFromMask(birthDateMasked)) next.birthDate = 'Fecha no válida — usa DD/MM/AAAA';
     }
     setErrors(next);
     return Object.keys(next).length === 0;
@@ -247,7 +329,6 @@ export default function AddProfileModal() {
 
   const handleCreate = () => {
     if (!profileType || !validate()) return;
-
     let profile: Profile;
 
     if (profileType === 'pregnancy') {
@@ -264,16 +345,16 @@ export default function AddProfileModal() {
       };
       profile = p;
     } else {
-      const childColor = sex === 'female' ? Colors.rose : Colors.skyBlue;
       const c: ChildProfile = {
         id: generateId(),
         type: 'child',
         name: childName.trim(),
-        color: childColor,
+        color: sex === 'female' ? Colors.rose : Colors.skyBlue,
         createdAt: new Date().toISOString(),
         birthDate: isoFromMask(birthDateMasked),
         sex,
         bloodType: childBloodType || undefined,
+        allergies,
       };
       profile = c;
     }
@@ -283,27 +364,16 @@ export default function AddProfileModal() {
   };
 
   const handleBack = () => {
-    if (step === 2) {
-      setStep(1);
-      setErrors({});
-    } else {
-      router.back();
-    }
+    if (step === 2) { setStep(1); setErrors({}); }
+    else router.back();
   };
 
   const previewName = profileType === 'pregnancy' ? motherName : childName;
-  const previewColor =
-    profileType === 'pregnancy'
-      ? Colors.lavender
-      : sex === 'female'
-      ? Colors.rose
-      : Colors.skyBlue;
-  const previewEmoji =
-    profileType === 'pregnancy' ? '🤰' : sex === 'female' ? '👧' : '👦';
-  const previewKeyData =
-    profileType === 'pregnancy'
-      ? (furMasked.length === 10 ? `FPP: ${fppMasked}` : 'FPP pendiente')
-      : (birthDateMasked.length === 10 ? `Nacido/a ${birthDateMasked}` : 'Fecha pendiente');
+  const previewColor = profileType === 'pregnancy' ? Colors.lavender : (sex === 'female' ? Colors.rose : Colors.skyBlue);
+  const previewEmoji = profileType === 'pregnancy' ? '🤰' : (sex === 'female' ? '👧' : '👦');
+  const previewKeyData = profileType === 'pregnancy'
+    ? (fppMasked.length === 10 ? `FPP: ${fppMasked}` : 'FPP pendiente')
+    : (birthDateMasked.length === 10 ? `Nac. ${birthDateMasked}` : 'Fecha pendiente');
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -313,8 +383,8 @@ export default function AddProfileModal() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}
       >
         <View style={styles.topBar}>
-          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Text style={styles.backButton}>{step === 2 ? '← Atrás' : '✕ Cancelar'}</Text>
+          <TouchableOpacity onPress={handleBack} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Text style={styles.backBtn}>{step === 2 ? '← Atrás' : '✕ Cancelar'}</Text>
           </TouchableOpacity>
           <StepDots current={step} />
           <Text style={styles.stepLabel}>Paso {step}/2</Text>
@@ -331,31 +401,27 @@ export default function AddProfileModal() {
               <Text style={styles.subtitle}>¿De qué tipo quieres crear el perfil?</Text>
 
               <TouchableOpacity
-                style={[styles.typeCard, styles.typeCardPregnancy]}
+                style={[styles.typeCard, { borderColor: Colors.lavender }]}
                 onPress={() => handleTypeSelect('pregnancy')}
                 activeOpacity={0.8}
               >
                 <Text style={styles.typeEmoji}>🤰</Text>
-                <View style={styles.typeText}>
+                <View style={styles.typeBody}>
                   <Text style={styles.typeTitle}>Estoy embarazada</Text>
-                  <Text style={styles.typeDesc}>
-                    Seguimiento semana a semana, checklist prenatal y síntomas por trimestre
-                  </Text>
+                  <Text style={styles.typeDesc}>Seguimiento semanal, checklist prenatal y síntomas</Text>
                 </View>
                 <Text style={styles.typeArrow}>›</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.typeCard, styles.typeCardChild]}
+                style={[styles.typeCard, { borderColor: Colors.coral }]}
                 onPress={() => handleTypeSelect('child')}
                 activeOpacity={0.8}
               >
                 <Text style={styles.typeEmoji}>👶</Text>
-                <View style={styles.typeText}>
+                <View style={styles.typeBody}>
                   <Text style={styles.typeTitle}>Mi hijo/a ya nació</Text>
-                  <Text style={styles.typeDesc}>
-                    Salud, vacunas, nutrición, hitos del desarrollo y educación escolar
-                  </Text>
+                  <Text style={styles.typeDesc}>Salud, vacunas, nutrición y desarrollo</Text>
                 </View>
                 <Text style={styles.typeArrow}>›</Text>
               </TouchableOpacity>
@@ -368,14 +434,11 @@ export default function AddProfileModal() {
 
               <Field label="NOMBRE DE LA MADRE" error={errors.motherName}>
                 <TextInput
-                  style={[styles.input, errors.motherName ? styles.inputError : null]}
+                  style={[styles.input, errors.motherName && styles.inputError]}
                   placeholder="Ej: Ana"
                   placeholderTextColor={Colors.textSecondary}
                   value={motherName}
-                  onChangeText={(v) => {
-                    setMotherName(v);
-                    if (errors.motherName) setErrors((e) => ({ ...e, motherName: '' }));
-                  }}
+                  onChangeText={(v) => { setMotherName(v); if (errors.motherName) setErrors((e) => ({ ...e, motherName: '' })); }}
                   autoCapitalize="words"
                   returnKeyType="next"
                 />
@@ -384,20 +447,14 @@ export default function AddProfileModal() {
               <DateField
                 label="FECHA DE ÚLTIMA REGLA (FUR)"
                 value={furMasked}
-                onChange={(v) => {
-                  setFurMasked(v);
-                  if (errors.fur) setErrors((e) => ({ ...e, fur: '' }));
-                }}
+                onChange={(v) => { setFurMasked(v); if (errors.fur) setErrors((e) => ({ ...e, fur: '' })); }}
                 error={errors.fur}
               />
 
               <DateField
                 label="FECHA PROBABLE DE PARTO (FPP)"
                 value={fppMasked}
-                onChange={(v) => {
-                  setFppMasked(v);
-                  if (errors.fpp) setErrors((e) => ({ ...e, fpp: '' }));
-                }}
+                onChange={(v) => { setFppMasked(v); if (errors.fpp) setErrors((e) => ({ ...e, fpp: '' })); }}
                 error={errors.fpp}
               />
 
@@ -405,19 +462,9 @@ export default function AddProfileModal() {
                 <BloodTypeSelector value={bloodType} onSelect={setBloodType} />
               </Field>
 
-              <ProfilePreview
-                type="pregnancy"
-                name={motherName}
-                keyData={previewKeyData}
-                color={previewColor}
-                typeEmoji={previewEmoji}
-              />
+              <ProfilePreview type="pregnancy" name={motherName} keyData={previewKeyData} color={previewColor} typeEmoji={previewEmoji} />
 
-              <TouchableOpacity
-                style={[styles.ctaButton, styles.ctaPregnancy]}
-                onPress={handleCreate}
-                activeOpacity={0.85}
-              >
+              <TouchableOpacity style={[styles.cta, { backgroundColor: Colors.lavender }]} onPress={handleCreate} activeOpacity={0.85}>
                 <Text style={styles.ctaText}>Crear perfil de embarazo</Text>
               </TouchableOpacity>
             </>
@@ -429,14 +476,11 @@ export default function AddProfileModal() {
 
               <Field label="NOMBRE" error={errors.childName}>
                 <TextInput
-                  style={[styles.input, errors.childName ? styles.inputError : null]}
+                  style={[styles.input, errors.childName && styles.inputError]}
                   placeholder="Ej: Sofía"
                   placeholderTextColor={Colors.textSecondary}
                   value={childName}
-                  onChangeText={(v) => {
-                    setChildName(v);
-                    if (errors.childName) setErrors((e) => ({ ...e, childName: '' }));
-                  }}
+                  onChangeText={(v) => { setChildName(v); if (errors.childName) setErrors((e) => ({ ...e, childName: '' })); }}
                   autoCapitalize="words"
                   returnKeyType="next"
                 />
@@ -449,10 +493,7 @@ export default function AddProfileModal() {
               <DateField
                 label="FECHA DE NACIMIENTO"
                 value={birthDateMasked}
-                onChange={(v) => {
-                  setBirthDateMasked(v);
-                  if (errors.birthDate) setErrors((e) => ({ ...e, birthDate: '' }));
-                }}
+                onChange={(v) => { setBirthDateMasked(v); if (errors.birthDate) setErrors((e) => ({ ...e, birthDate: '' })); }}
                 error={errors.birthDate}
               />
 
@@ -460,19 +501,14 @@ export default function AddProfileModal() {
                 <BloodTypeSelector value={childBloodType} onSelect={setChildBloodType} />
               </Field>
 
-              <ProfilePreview
-                type="child"
-                name={childName}
-                keyData={previewKeyData}
-                color={previewColor}
-                typeEmoji={previewEmoji}
-              />
+              <Field label="ALERGIAS E INTOLERANCIAS (opcional)">
+                <AllergyInput values={allergies} onChange={setAllergies} />
+              </Field>
+
+              <ProfilePreview type="child" name={childName} keyData={previewKeyData} color={previewColor} typeEmoji={previewEmoji} />
 
               <TouchableOpacity
-                style={[
-                  styles.ctaButton,
-                  { backgroundColor: sex === 'female' ? Colors.rose : Colors.skyBlue },
-                ]}
+                style={[styles.cta, { backgroundColor: sex === 'female' ? Colors.rose : Colors.skyBlue }]}
                 onPress={handleCreate}
                 activeOpacity={0.85}
               >
@@ -488,9 +524,12 @@ export default function AddProfileModal() {
   );
 }
 
+// ─── styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: Colors.background },
   flex: { flex: 1 },
+
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -499,99 +538,47 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 8,
   },
-  backButton: {
+  backBtn: {
     ...Typography.bodyMedium,
     color: Colors.lavender,
     fontWeight: '700',
     minWidth: 80,
   },
-  stepDots: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: Colors.border,
-  },
-  dotActive: {
-    backgroundColor: Colors.lavender,
-    width: 20,
-  },
-  dotDone: {
-    backgroundColor: `${Colors.lavender}60`,
-  },
+  stepDots: { flexDirection: 'row', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.border },
+  dotActive: { backgroundColor: Colors.lavender, width: 20 },
+  dotDone: { backgroundColor: `${Colors.lavender}60` },
   stepLabel: {
     ...Typography.caption,
     color: Colors.textSecondary,
     minWidth: 80,
     textAlign: 'right',
   },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 48,
-  },
-  title: {
-    ...Typography.titleBold,
-    marginTop: 12,
-    marginBottom: 6,
-  },
-  subtitle: {
-    ...Typography.bodyRegular,
-    marginBottom: 24,
-  },
+
+  scroll: { paddingHorizontal: 20, paddingBottom: 52 },
+  title: { ...Typography.titleBold, marginTop: 12, marginBottom: 6 },
+  subtitle: { ...Typography.bodyRegular, marginBottom: 28 },
+
   typeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: Colors.surface,
     borderRadius: 20,
     padding: 20,
-    gap: 16,
+    gap: 14,
     marginBottom: 14,
     borderWidth: 2,
     ...Shadows.card,
   },
-  typeCardPregnancy: {
-    borderColor: Colors.lavender,
-  },
-  typeCardChild: {
-    borderColor: Colors.coral,
-  },
-  typeEmoji: {
-    fontSize: 40,
-    width: 48,
-    textAlign: 'center',
-  },
-  typeText: {
-    flex: 1,
-    gap: 4,
-  },
-  typeTitle: {
-    ...Typography.headingBold,
-    fontSize: 17,
-  },
-  typeDesc: {
-    ...Typography.bodyRegular,
-    lineHeight: 18,
-  },
-  typeArrow: {
-    fontSize: 24,
-    color: Colors.textSecondary,
-    fontWeight: '300',
-  },
-  field: {
-    gap: 8,
-    marginBottom: 20,
-  },
-  fieldLabel: {
-    ...Typography.labelUppercase,
-  },
-  fieldError: {
-    ...Typography.caption,
-    color: Colors.rose,
-    marginTop: 2,
-  },
+  typeEmoji: { fontSize: 38, width: 44, textAlign: 'center' },
+  typeBody: { flex: 1, gap: 4 },
+  typeTitle: { ...Typography.headingBold, fontSize: 17 },
+  typeDesc: { ...Typography.bodyRegular, lineHeight: 18 },
+  typeArrow: { fontSize: 26, color: Colors.textSecondary, fontWeight: '300' },
+
+  field: { gap: 8, marginBottom: 20 },
+  fieldLabel: { ...Typography.labelUppercase },
+  fieldError: { ...Typography.caption, color: Colors.rose, marginTop: 2 },
   input: {
     backgroundColor: Colors.surface,
     borderRadius: 12,
@@ -603,40 +590,24 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: Colors.border,
   },
-  inputError: {
-    borderColor: Colors.rose,
-  },
-  bloodGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  bloodChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  inputError: { borderColor: Colors.rose },
+
+  chipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     borderRadius: 10,
     backgroundColor: Colors.surface,
     borderWidth: 1.5,
     borderColor: Colors.border,
-    minWidth: 52,
+    minWidth: 50,
     alignItems: 'center',
   },
-  bloodChipActive: {
-    backgroundColor: `${Colors.coral}15`,
-    borderColor: Colors.coral,
-  },
-  bloodChipText: {
-    ...Typography.bodyMedium,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
-  bloodChipTextActive: {
-    color: Colors.coral,
-  },
-  sexRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
+  chipActiveBlood: { backgroundColor: `${Colors.coral}15`, borderColor: Colors.coral },
+  chipText: { ...Typography.bodyMedium, fontWeight: '700', color: Colors.textSecondary },
+  chipTextActiveBlood: { color: Colors.coral },
+
+  sexRow: { flexDirection: 'row', gap: 12 },
   sexCard: {
     flex: 1,
     backgroundColor: Colors.surface,
@@ -648,97 +619,74 @@ const styles = StyleSheet.create({
     borderColor: Colors.border,
     position: 'relative',
   },
-  sexEmoji: {
-    fontSize: 34,
-  },
-  sexLabel: {
-    ...Typography.bodyMedium,
-    fontWeight: '700',
-    color: Colors.textSecondary,
-  },
+  sexEmoji: { fontSize: 34 },
+  sexLabel: { ...Typography.bodyMedium, fontWeight: '700', color: Colors.textSecondary },
   sexCheck: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    position: 'absolute', top: 8, right: 8,
+    width: 20, height: 20, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
   },
-  sexCheckMark: {
-    color: Colors.surface,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  previewCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    marginTop: 4,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    ...Shadows.card,
-  },
-  previewLabel: {
-    ...Typography.labelUppercase,
-    marginBottom: 12,
-  },
-  previewRow: {
+  sexCheckMark: { color: Colors.surface, fontSize: 11, fontWeight: '800' },
+
+  allergyWrapper: { gap: 12 },
+  tagList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  allergyTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
+    gap: 5,
+    backgroundColor: `${Colors.rose}15`,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: `${Colors.rose}30`,
   },
-  previewAvatar: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  previewAvatarLetter: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Colors.surface,
-  },
-  previewBadge: {
-    position: 'absolute',
-    bottom: -2,
-    right: -4,
+  allergyTagText: { ...Typography.bodyMedium, color: Colors.rose, fontWeight: '600' },
+  allergyTagRemove: { fontSize: 16, color: Colors.rose, lineHeight: 18, marginTop: -1 },
+  allergyInputRow: { flexDirection: 'row', gap: 8 },
+  allergyInput: {
+    flex: 1,
     backgroundColor: Colors.surface,
-    borderRadius: 10,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 12,
+    height: 46,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    fontWeight: '500',
+    color: Colors.textPrimary,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
   },
-  previewBadgeEmoji: {
-    fontSize: 12,
-    lineHeight: 14,
+  allergyAddBtn: {
+    height: 46, paddingHorizontal: 18, borderRadius: 12,
+    backgroundColor: Colors.rose, alignItems: 'center', justifyContent: 'center',
   },
-  previewName: {
-    ...Typography.headingBold,
-    fontSize: 17,
+  allergyAddBtnDisabled: { backgroundColor: Colors.border },
+  allergyAddBtnText: { ...Typography.bodyMedium, fontWeight: '700', color: Colors.surface },
+  quickSection: { gap: 8 },
+  quickLabel: { ...Typography.labelUppercase, fontSize: 10 },
+  quickChip: {
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10,
+    backgroundColor: Colors.surface, borderWidth: 1.5, borderColor: `${Colors.rose}40`,
   },
-  previewMeta: {
-    ...Typography.caption,
-    marginTop: 2,
+  quickChipText: { ...Typography.bodyMedium, color: Colors.rose, fontWeight: '600', fontSize: 13 },
+
+  previewCard: {
+    backgroundColor: Colors.surface, borderRadius: 16, padding: 16,
+    marginBottom: 20, marginTop: 4, borderWidth: 1, borderColor: Colors.border,
+    gap: 12, ...Shadows.card,
   },
-  ctaButton: {
-    height: 54,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 4,
+  previewRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  previewAvatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  previewLetter: { fontSize: 22, fontWeight: '800', color: Colors.surface },
+  previewBadge: {
+    position: 'absolute', bottom: -2, right: -4,
+    backgroundColor: Colors.surface, borderRadius: 10,
+    width: 20, height: 20, alignItems: 'center', justifyContent: 'center',
   },
-  ctaPregnancy: {
-    backgroundColor: Colors.lavender,
-  },
-  ctaText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: Colors.surface,
-    letterSpacing: 0.2,
-  },
+  previewBadgeEmoji: { fontSize: 12, lineHeight: 14 },
+  previewName: { ...Typography.headingBold, fontSize: 17 },
+  previewMeta: { ...Typography.caption, marginTop: 2 },
+
+  cta: { height: 54, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  ctaText: { fontSize: 16, fontWeight: '700', color: Colors.surface, letterSpacing: 0.2 },
 });

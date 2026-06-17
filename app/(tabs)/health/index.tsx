@@ -1,14 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ScrollView, View, Text, StyleSheet, TouchableOpacity, TextInput,
+  View, Text, StyleSheet, TouchableOpacity, TextInput,
   Modal, Pressable, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { differenceInMonths, differenceInYears, parseISO, format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
 import { Card } from '@/shared/ui/Card';
+import { AppScreen } from '@/shared/ui/AppScreen';
+import { AppHeader } from '@/shared/ui/AppHeader';
+import { SegmentedControl } from '@/shared/ui/SegmentedControl';
+import { AlertCard } from '@/shared/ui/AlertCard';
+import { PrimaryButton } from '@/shared/ui/PrimaryButton';
 import { useProfileStore } from '@/store/profileStore';
 import { useHealthStore } from '@/store/healthStore';
 import {
@@ -55,7 +59,6 @@ function runDiagnosis(symptoms: string[]): DiagnosisResult[] {
       });
     }
   }
-  // Sort urgent first
   return results.sort((a, b) => {
     const order = { urgent: 0, soon: 1, routine: 2 };
     return order[a.urgency] - order[b.urgency];
@@ -66,7 +69,6 @@ function runDiagnosis(symptoms: string[]): DiagnosisResult[] {
 
 function PercentileGauge({ percentile }: { percentile: number }) {
   const clampedPct = Math.min(Math.max(percentile, 1), 99);
-  // Map percentile to position (0–100%)
   const markerPos = clampedPct;
   const zone =
     percentile < 3  ? 'bajo'          :
@@ -80,27 +82,17 @@ function PercentileGauge({ percentile }: { percentile: number }) {
 
   return (
     <View style={gaugeStyles.container}>
-      {/* Track with colored zones */}
       <View style={gaugeStyles.track}>
-        {/* Zone: <P3 (0-3%) */}
         <View style={[gaugeStyles.zone, { flex: 3, backgroundColor: `${Colors.coral}35` }]} />
-        {/* Zone: P3-P15 (3-15%) */}
         <View style={[gaugeStyles.zone, { flex: 12, backgroundColor: `${Colors.amber}35` }]} />
-        {/* Zone: P15-P85 (15-85%) */}
         <View style={[gaugeStyles.zone, { flex: 70, backgroundColor: `${Colors.mint}30` }]} />
-        {/* Zone: P85-P97 (85-97%) */}
         <View style={[gaugeStyles.zone, { flex: 12, backgroundColor: `${Colors.amber}35` }]} />
-        {/* Zone: >P97 (97-100%) */}
         <View style={[gaugeStyles.zone, { flex: 3, backgroundColor: `${Colors.coral}35` }]} />
       </View>
-
-      {/* Marker */}
-      <View style={[gaugeStyles.markerContainer, { left: `${markerPos}%` }]}>
+      <View style={[gaugeStyles.markerContainer, { left: `${markerPos}%` as any }]}>
         <View style={[gaugeStyles.marker, { backgroundColor: zoneColor }]} />
         <Text style={[gaugeStyles.markerLabel, { color: zoneColor }]}>P{Math.round(percentile)}</Text>
       </View>
-
-      {/* Labels */}
       <View style={gaugeStyles.labels}>
         <Text style={gaugeStyles.labelText}>P3</Text>
         <Text style={gaugeStyles.labelText}>P15</Text>
@@ -134,15 +126,9 @@ const gaugeStyles = StyleSheet.create({
   labelText: { ...Typography.caption, fontSize: 10 },
 });
 
-// ─── Growth Mini Chart (bar chart) ────────────────────────────────────────────
+// ─── Growth Mini Chart ────────────────────────────────────────────────────────
 
-function GrowthBarChart({
-  records,
-  metric,
-}: {
-  records: GrowthRecord[];
-  metric: 'weight' | 'height';
-}) {
+function GrowthBarChart({ records, metric }: { records: GrowthRecord[]; metric: 'weight' | 'height' }) {
   if (records.length === 0) return null;
   const last7 = records.slice(-7);
   const vals = last7.map((r) => (metric === 'weight' ? r.weight : r.height));
@@ -181,7 +167,7 @@ const bcStyles = StyleSheet.create({
   label: { fontSize: 8, color: Colors.textSecondary, marginTop: 3 },
 });
 
-// ─── Add Growth Record Modal ──────────────────────────────────────────────────
+// ─── Add Growth Modal ─────────────────────────────────────────────────────────
 
 function AddGrowthModal({
   visible, onClose, onAdd, ageMonths,
@@ -270,13 +256,7 @@ const modalStyles = StyleSheet.create({
 
 // ─── Growth Tab ───────────────────────────────────────────────────────────────
 
-function GrowthTab({
-  profile,
-  ageMonths,
-}: {
-  profile: ChildProfile;
-  ageMonths: number;
-}) {
+function GrowthTab({ profile, ageMonths }: { profile: ChildProfile; ageMonths: number }) {
   const [chartMetric, setChartMetric] = useState<'weight' | 'height'>('weight');
   const [addOpen, setAddOpen] = useState(false);
   const getGrowthRecords = useHealthStore((s) => s.getGrowthRecords);
@@ -285,22 +265,13 @@ function GrowthTab({
   const records = getGrowthRecords(profile.id);
   const latest = records.length > 0 ? records[records.length - 1] : null;
 
-  const currentWeightPct = latest
-    ? calcPercentile(latest.weight, ageMonths, profile.sex, 'weight')
-    : null;
-  const currentHeightPct = latest
-    ? calcPercentile(latest.height, ageMonths, profile.sex, 'height')
-    : null;
+  const currentWeightPct = latest ? calcPercentile(latest.weight, ageMonths, profile.sex, 'weight') : null;
+  const currentHeightPct = latest ? calcPercentile(latest.height, ageMonths, profile.sex, 'height') : null;
 
   const handleAdd = (data: Omit<GrowthRecord, 'id' | 'weightPercentile' | 'heightPercentile'>) => {
     const wPct = calcPercentile(data.weight, ageMonths, profile.sex, 'weight');
     const hPct = calcPercentile(data.height, ageMonths, profile.sex, 'height');
-    addGrowthRecord(profile.id, {
-      ...data,
-      id: generateId(),
-      weightPercentile: wPct,
-      heightPercentile: hPct,
-    });
+    addGrowthRecord(profile.id, { ...data, id: generateId(), weightPercentile: wPct, heightPercentile: hPct });
   };
 
   const confirmRemove = (id: string) => {
@@ -312,7 +283,6 @@ function GrowthTab({
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Current stats */}
       <Card padding={16}>
         <View style={growthStyles.headerRow}>
           <Text style={growthStyles.cardLabel}>PESO Y TALLA ACTUALES</Text>
@@ -362,7 +332,6 @@ function GrowthTab({
         )}
       </Card>
 
-      {/* History chart */}
       {records.length > 1 && (
         <Card padding={16}>
           <View style={growthStyles.headerRow}>
@@ -385,7 +354,6 @@ function GrowthTab({
         </Card>
       )}
 
-      {/* Records list */}
       {records.length > 0 && (
         <Card padding={0} style={{ overflow: 'hidden' }}>
           <View style={growthStyles.listHeader}>
@@ -403,7 +371,7 @@ function GrowthTab({
               <View style={{ flex: 1 }}>
                 <Text style={growthStyles.recordValues}>{r.weight} kg · {r.height} cm</Text>
                 <Text style={growthStyles.recordDate}>
-                  {format(parseISO(r.date), "d MMM yyyy", { locale: es })}
+                  {format(parseISO(r.date), 'd MMM yyyy', { locale: es })}
                 </Text>
               </View>
               {r.weightPercentile != null && (
@@ -445,10 +413,7 @@ const growthStyles = StyleSheet.create({
   lastUpdate: { ...Typography.caption, textAlign: 'center', marginTop: 14, fontStyle: 'italic' },
   emptyText: { ...Typography.bodyRegular, textAlign: 'center', paddingVertical: 12 },
   metricTabs: { flexDirection: 'row', gap: 6 },
-  metricTab: {
-    paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8,
-    backgroundColor: Colors.border,
-  },
+  metricTab: { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, backgroundColor: Colors.border },
   metricTabActive: { backgroundColor: Colors.coral },
   metricTabText: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
   metricTabTextActive: { color: '#fff' },
@@ -462,9 +427,7 @@ const growthStyles = StyleSheet.create({
   recordAgeNum: { fontSize: 11, fontWeight: '700', color: Colors.coral },
   recordValues: { ...Typography.bodyMedium },
   recordDate: { ...Typography.caption, marginTop: 2 },
-  pctBadge: {
-    backgroundColor: `${Colors.mint}18`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3,
-  },
+  pctBadge: { backgroundColor: `${Colors.mint}18`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
   pctBadgeText: { ...Typography.caption, color: Colors.mint, fontWeight: '700' },
   hint: { ...Typography.caption, textAlign: 'center', paddingVertical: 8, color: Colors.textSecondary, fontStyle: 'italic' },
 });
@@ -479,21 +442,18 @@ function VaccinesTab({ profile, ageMonths }: { profile: ChildProfile; ageMonths:
   const doneCount = getDoneCount(profile.id);
   const total = VACCINE_CALENDAR.length;
 
-  // Group by group label
   const groups = VACCINE_CALENDAR.reduce<Record<string, typeof VACCINE_CALENDAR>>((acc, v) => {
     if (!acc[v.group]) acc[v.group] = [];
     acc[v.group].push(v);
     return acc;
   }, {});
 
-  // Find upcoming vaccines (due in next 3 months, not done)
   const upcoming = VACCINE_CALENDAR.filter(
     (v) => !isVaccineDone(profile.id, v.id) && v.ageMonths <= ageMonths + 3
   );
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Progress card */}
       <Card padding={16}>
         <Text style={vacStyles.cardLabel}>PROGRESO VACUNAL</Text>
         <View style={vacStyles.progressRow}>
@@ -504,32 +464,22 @@ function VaccinesTab({ profile, ageMonths }: { profile: ChildProfile; ageMonths:
           <View style={vacStyles.progressRight}>
             <Text style={vacStyles.totalText}>{total - doneCount} pendientes</Text>
             <View style={vacStyles.progressTrack}>
-              <View style={[vacStyles.progressFill, { width: `${(doneCount / total) * 100}%` }]} />
+              <View style={[vacStyles.progressFill, { width: `${(doneCount / total) * 100}%` as any }]} />
             </View>
             <Text style={vacStyles.totalSmall}>Total: {total} vacunas</Text>
           </View>
         </View>
       </Card>
 
-      {/* Upcoming alert */}
       {upcoming.length > 0 && (
-        <View style={vacStyles.alertBanner}>
-          <Text style={vacStyles.alertIcon}>📅</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={vacStyles.alertTitle}>Próximas vacunas</Text>
-            {upcoming.slice(0, 3).map((v) => (
-              <Text key={v.id} style={vacStyles.alertItem}>
-                · {v.name} ({v.doseLabel}) — {v.group}
-              </Text>
-            ))}
-            {upcoming.length > 3 && (
-              <Text style={vacStyles.alertMore}>+{upcoming.length - 3} más</Text>
-            )}
-          </View>
-        </View>
+        <AlertCard type="warning" icon="📅" title="Próximas vacunas">
+          {upcoming.slice(0, 3).map((v) => (
+            <Text key={v.id} style={{ ...Typography.bodyRegular, marginBottom: 2 }}>· {v.name} ({v.doseLabel}) — {v.group}</Text>
+          ))}
+          {upcoming.length > 3 && <Text style={{ ...Typography.caption, color: Colors.amber, marginTop: 2 }}>+{upcoming.length - 3} más</Text>}
+        </AlertCard>
       )}
 
-      {/* Calendar grouped */}
       {Object.entries(groups).map(([groupName, vaccines]) => {
         const groupDone = vaccines.filter((v) => isVaccineDone(profile.id, v.id)).length;
         const groupDue  = vaccines.some((v) => !isVaccineDone(profile.id, v.id) && v.ageMonths <= ageMonths + 3);
@@ -548,7 +498,7 @@ function VaccinesTab({ profile, ageMonths }: { profile: ChildProfile; ageMonths:
             </View>
             <View style={vacStyles.groupProgressTrack}>
               <View style={[vacStyles.groupProgressFill, {
-                width: `${(groupDone / vaccines.length) * 100}%`,
+                width: `${(groupDone / vaccines.length) * 100}%` as any,
                 backgroundColor: groupDone === vaccines.length ? Colors.mint : Colors.coral,
               }]} />
             </View>
@@ -567,20 +517,14 @@ function VaccinesTab({ profile, ageMonths }: { profile: ChildProfile; ageMonths:
                     {done && <Text style={vacStyles.checkmark}>✓</Text>}
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[vacStyles.vaccineName, done && vacStyles.vaccineNameDone]}>
-                      {v.name}
-                    </Text>
+                    <Text style={[vacStyles.vaccineName, done && vacStyles.vaccineNameDone]}>{v.name}</Text>
                     <Text style={vacStyles.vaccineDose}>{v.doseLabel}</Text>
                   </View>
                   {isOverdue && !done && (
-                    <View style={vacStyles.overdueBadge}>
-                      <Text style={vacStyles.overdueBadgeText}>Pendiente</Text>
-                    </View>
+                    <View style={vacStyles.overdueBadge}><Text style={vacStyles.overdueBadgeText}>Pendiente</Text></View>
                   )}
                   {isUpcoming && (
-                    <View style={vacStyles.upcomingBadge}>
-                      <Text style={vacStyles.upcomingBadgeText}>Próxima</Text>
-                    </View>
+                    <View style={vacStyles.upcomingBadge}><Text style={vacStyles.upcomingBadgeText}>Próxima</Text></View>
                   )}
                 </TouchableOpacity>
               );
@@ -602,15 +546,6 @@ const vacStyles = StyleSheet.create({
   totalSmall: { ...Typography.caption },
   progressTrack: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 6, backgroundColor: Colors.coral, borderRadius: 3 },
-  alertBanner: {
-    flexDirection: 'row', gap: 12, alignItems: 'flex-start',
-    backgroundColor: `${Colors.amber}14`, borderRadius: 14, padding: 14,
-    borderWidth: 1, borderColor: `${Colors.amber}35`,
-  },
-  alertIcon: { fontSize: 20, marginTop: 2 },
-  alertTitle: { ...Typography.bodyMedium, fontWeight: '700', color: Colors.amber, marginBottom: 4 },
-  alertItem: { ...Typography.bodyRegular, marginBottom: 2 },
-  alertMore: { ...Typography.caption, color: Colors.amber, marginTop: 2 },
   groupHeader: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 16, paddingTop: 12, paddingBottom: 6,
@@ -620,9 +555,7 @@ const vacStyles = StyleSheet.create({
   groupProgress: { ...Typography.caption, color: Colors.textSecondary },
   groupProgressTrack: { height: 3, backgroundColor: Colors.border },
   groupProgressFill: { height: 3 },
-  dueBadge: {
-    backgroundColor: `${Colors.amber}20`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-  },
+  dueBadge: { backgroundColor: `${Colors.amber}20`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   dueBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.amber },
   vaccineRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   vaccineBorder: { borderTopWidth: 1, borderTopColor: Colors.border },
@@ -635,13 +568,9 @@ const vacStyles = StyleSheet.create({
   vaccineName: { ...Typography.bodyMedium },
   vaccineNameDone: { color: Colors.textSecondary, textDecorationLine: 'line-through' },
   vaccineDose: { ...Typography.caption, marginTop: 1 },
-  overdueBadge: {
-    backgroundColor: `${Colors.coral}18`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-  },
+  overdueBadge: { backgroundColor: `${Colors.coral}18`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   overdueBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.coral },
-  upcomingBadge: {
-    backgroundColor: `${Colors.amber}18`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2,
-  },
+  upcomingBadge: { backgroundColor: `${Colors.amber}18`, borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   upcomingBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.amber },
 });
 
@@ -663,7 +592,7 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
     setSelectedSymptoms((prev) =>
       prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
     );
-    setDiagnosis(null); // Reset on change
+    setDiagnosis(null);
   };
 
   const handleAnalyze = () => {
@@ -694,19 +623,18 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
   const URGENCY_COLOR = { routine: Colors.mint, soon: Colors.amber, urgent: Colors.coral };
   const URGENCY_LABEL = { routine: 'Consulta rutinaria', soon: 'Consultar pronto', urgent: '🚨 Urgente' };
 
-  const symptomLabel = (id: string) =>
-    SYMPTOM_OPTIONS.find((s) => s.id === id)?.label ?? id;
+  const symptomLabel = (id: string) => SYMPTOM_OPTIONS.find((s) => s.id === id)?.label ?? id;
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Add symptom button */}
       {!formOpen && (
-        <TouchableOpacity style={sympStyles.openFormBtn} onPress={() => setFormOpen(true)}>
-          <Text style={sympStyles.openFormText}>+ Registrar síntomas ahora</Text>
-        </TouchableOpacity>
+        <PrimaryButton
+          label="+ Registrar síntomas ahora"
+          onPress={() => setFormOpen(true)}
+          color={Colors.coral}
+        />
       )}
 
-      {/* Form */}
       {formOpen && (
         <Card padding={16}>
           <View style={sympStyles.formHeaderRow}>
@@ -716,7 +644,6 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
             </TouchableOpacity>
           </View>
 
-          {/* Symptom grid */}
           <View style={sympStyles.symptomGrid}>
             {SYMPTOM_OPTIONS.map((opt) => {
               const active = selectedSymptoms.includes(opt.id);
@@ -735,7 +662,6 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
             })}
           </View>
 
-          {/* Fever input */}
           {selectedSymptoms.includes('fever') && (
             <View style={sympStyles.feverRow}>
               <Text style={sympStyles.feverLabel}>🌡️ Temperatura:</Text>
@@ -750,7 +676,6 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
             </View>
           )}
 
-          {/* Notes */}
           <TextInput
             style={sympStyles.notesInput}
             placeholder="Observaciones (opcional)"
@@ -760,7 +685,6 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
             numberOfLines={2}
           />
 
-          {/* Actions */}
           <View style={sympStyles.formActions}>
             <TouchableOpacity
               style={[sympStyles.analyzeBtn, selectedSymptoms.length === 0 && sympStyles.btnDisabled]}
@@ -769,21 +693,20 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
             >
               <Text style={sympStyles.analyzeBtnText}>🔍 Orientación</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[sympStyles.saveBtn, selectedSymptoms.length === 0 && sympStyles.btnDisabled]}
+            <PrimaryButton
+              label="Guardar registro"
               onPress={handleSaveLog}
+              color={Colors.coral}
               disabled={selectedSymptoms.length === 0}
-            >
-              <Text style={sympStyles.saveBtnText}>Guardar registro</Text>
-            </TouchableOpacity>
+              fullWidth={false}
+              style={{ flex: 1 }}
+            />
           </View>
         </Card>
       )}
 
-      {/* Pre-diagnosis results */}
       {diagnosis !== null && (
         <Card padding={16}>
-          {/* DISCLAIMER */}
           <View style={sympStyles.disclaimer}>
             <Text style={sympStyles.disclaimerIcon}>⚕️</Text>
             <Text style={sympStyles.disclaimerText}>
@@ -824,7 +747,6 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
         </Card>
       )}
 
-      {/* Log history */}
       {logs.length > 0 && (
         <Card padding={0} style={{ overflow: 'hidden' }}>
           <View style={sympStyles.listHeader}>
@@ -834,22 +756,18 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
             <View key={log.id} style={[sympStyles.logRow, i > 0 && sympStyles.logBorder]}>
               <View style={sympStyles.logDate}>
                 <Text style={sympStyles.logDateText}>
-                  {format(parseISO(log.date), "d MMM", { locale: es })}
+                  {format(parseISO(log.date), 'd MMM', { locale: es })}
                 </Text>
                 <Text style={sympStyles.logDateYear}>
-                  {format(parseISO(log.date), "yyyy")}
+                  {format(parseISO(log.date), 'yyyy')}
                 </Text>
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={sympStyles.logSymptoms}>
                   {log.symptoms.map(symptomLabel).join(' · ')}
                 </Text>
-                {log.fever && (
-                  <Text style={sympStyles.logFever}>🌡️ {log.fever}°C</Text>
-                )}
-                {log.notes && (
-                  <Text style={sympStyles.logNotes}>{log.notes}</Text>
-                )}
+                {log.fever && <Text style={sympStyles.logFever}>🌡️ {log.fever}°C</Text>}
+                {log.notes && <Text style={sympStyles.logNotes}>{log.notes}</Text>}
               </View>
               <View style={sympStyles.logStatus}>
                 {log.resolved ? (
@@ -881,11 +799,6 @@ function SymptomsTab({ profile }: { profile: ChildProfile }) {
 
 const sympStyles = StyleSheet.create({
   cardLabel: { ...Typography.labelUppercase },
-  openFormBtn: {
-    backgroundColor: Colors.coral, borderRadius: 14, paddingVertical: 14,
-    alignItems: 'center',
-  },
-  openFormText: { ...Typography.bodyMedium, color: '#fff', fontWeight: '700' },
   formHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
   closeBtn: { fontSize: 18, color: Colors.textSecondary, padding: 4 },
   symptomGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
@@ -915,11 +828,6 @@ const sympStyles = StyleSheet.create({
     backgroundColor: `${Colors.lavender}14`, borderWidth: 1, borderColor: `${Colors.lavender}35`,
   },
   analyzeBtnText: { ...Typography.bodyMedium, color: Colors.lavender, fontWeight: '700' },
-  saveBtn: {
-    flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: 'center',
-    backgroundColor: Colors.coral,
-  },
-  saveBtnText: { ...Typography.bodyMedium, color: '#fff', fontWeight: '700' },
   btnDisabled: { opacity: 0.4 },
   disclaimer: {
     flexDirection: 'row', gap: 10, backgroundColor: `${Colors.amber}10`,
@@ -930,9 +838,7 @@ const sympStyles = StyleSheet.create({
   disclaimerText: { ...Typography.caption, flex: 1, lineHeight: 18 },
   noResults: { ...Typography.bodyRegular, textAlign: 'center', paddingVertical: 8, lineHeight: 22 },
   diagLabel: { ...Typography.labelUppercase },
-  diagCard: {
-    borderRadius: 10, borderWidth: 1, padding: 12, gap: 6,
-  },
+  diagCard: { borderRadius: 10, borderWidth: 1, padding: 12, gap: 6 },
   diagHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   diagCondition: { ...Typography.bodyMedium, fontWeight: '700', flex: 1 },
   urgencyBadge: { borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
@@ -953,10 +859,7 @@ const sympStyles = StyleSheet.create({
   logNotes: { ...Typography.caption, marginTop: 2, fontStyle: 'italic' },
   logStatus: { alignItems: 'flex-end', justifyContent: 'center' },
   logResolved: { ...Typography.caption, color: Colors.mint, fontWeight: '600' },
-  resolveBtn: {
-    backgroundColor: `${Colors.coral}14`, borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 4,
-  },
+  resolveBtn: { backgroundColor: `${Colors.coral}14`, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
   resolveBtnText: { ...Typography.caption, color: Colors.coral, fontWeight: '600' },
   emptyText: { ...Typography.bodyRegular, textAlign: 'center', lineHeight: 22 },
 });
@@ -991,111 +894,42 @@ export default function HealthScreen() {
   const ageText   = formatAge(profile.birthDate);
 
   return (
-    <SafeAreaView style={screenStyles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={screenStyles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* ── Hero ── */}
-        <View style={screenStyles.hero}>
-          <View style={screenStyles.heroTop}>
-            <View>
-              <Text style={screenStyles.heroTitle}>Salud</Text>
-              <Text style={screenStyles.heroName}>{profile.name}</Text>
-            </View>
-            <View style={screenStyles.heroStats}>
-              <View style={screenStyles.heroStat}>
-                <Text style={screenStyles.heroStatVal}>{ageText}</Text>
-                <Text style={screenStyles.heroStatLabel}>edad</Text>
+    <AppScreen edges={['bottom']} statusBarStyle="light-content">
+      <AppHeader title="Salud" subtitle={profile.name} section="health">
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: 12 }}>
+          <View>
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 18 }}>{ageText}</Text>
+            <Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 10 }}>edad</Text>
+          </View>
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {profile.bloodType && (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>🩸 {profile.bloodType}</Text>
               </View>
-              {profile.bloodType && (
-                <View style={screenStyles.bloodBadge}>
-                  <Text style={screenStyles.bloodText}>🩸 {profile.bloodType}</Text>
-                </View>
-              )}
-            </View>
-          </View>
-          {profile.allergies.length > 0 && (
-            <View style={screenStyles.allergyRow}>
-              <Text style={screenStyles.allergyLabel}>⚠️ ALERGIAS: </Text>
-              <Text style={screenStyles.allergyList}>{profile.allergies.join(' · ')}</Text>
-            </View>
-          )}
-        </View>
-
-        {/* ── Section Nav ── */}
-        <View style={screenStyles.navSection}>
-          <View style={screenStyles.navTabs}>
-            {NAV_SECTIONS.map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                style={[screenStyles.navTab, section === s.key && screenStyles.navTabActive]}
-                onPress={() => setSection(s.key)}
-              >
-                <Text style={screenStyles.navTabEmoji}>{s.emoji}</Text>
-                <Text style={[screenStyles.navTabLabel, section === s.key && screenStyles.navTabLabelActive]}>
-                  {s.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            )}
+            {profile.allergies.length > 0 && (
+              <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>⚠️ {profile.allergies.length} alergia{profile.allergies.length !== 1 ? 's' : ''}</Text>
+              </View>
+            )}
           </View>
         </View>
+      </AppHeader>
 
-        {/* ── Sections ── */}
-        <View style={screenStyles.content}>
-          {section === 'growth'   && <GrowthTab   profile={profile} ageMonths={ageMonths} />}
-          {section === 'vaccines' && <VaccinesTab profile={profile} ageMonths={ageMonths} />}
-          {section === 'symptoms' && <SymptomsTab profile={profile} />}
-        </View>
+      <SegmentedControl
+        segments={NAV_SECTIONS.map((s) => ({ key: s.key, label: s.label, emoji: s.emoji }))}
+        value={section}
+        onChange={setSection}
+        activeColor={Colors.coral}
+      />
 
-        <View style={{ height: 24 }} />
-      </ScrollView>
-    </SafeAreaView>
+      <View style={{ paddingHorizontal: 16, gap: 12 }}>
+        {section === 'growth'   && <GrowthTab   profile={profile} ageMonths={ageMonths} />}
+        {section === 'vaccines' && <VaccinesTab profile={profile} ageMonths={ageMonths} />}
+        {section === 'symptoms' && <SymptomsTab profile={profile} />}
+      </View>
+
+      <View style={{ height: 24 }} />
+    </AppScreen>
   );
 }
-
-const screenStyles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingBottom: 32 },
-
-  hero: {
-    backgroundColor: Colors.gradients.health[0],
-    paddingTop: 28, paddingBottom: 28, paddingHorizontal: 20,
-    borderBottomLeftRadius: 32, borderBottomRightRadius: 32,
-    marginBottom: 16,
-  },
-  heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  heroTitle: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -1 },
-  heroName: { ...Typography.headingBold, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  heroStats: { alignItems: 'flex-end', gap: 8 },
-  heroStat: { alignItems: 'flex-end' },
-  heroStatVal: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  heroStatLabel: { fontSize: 10, color: 'rgba(255,255,255,0.75)' },
-  bloodBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  bloodText: { ...Typography.caption, color: '#fff', fontWeight: '700' },
-  allergyRow: {
-    flexDirection: 'row', alignItems: 'center', marginTop: 12,
-    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 10, padding: 8,
-  },
-  allergyLabel: { fontSize: 10, fontWeight: '700', color: '#fff' },
-  allergyList: { ...Typography.caption, color: 'rgba(255,255,255,0.9)', flex: 1 },
-
-  navSection: { paddingHorizontal: 16, marginBottom: 12 },
-  navTabs: {
-    flexDirection: 'row', backgroundColor: Colors.surface,
-    borderRadius: 16, padding: 4, gap: 4,
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1, shadowRadius: 8, elevation: 3,
-  },
-  navTab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: 10, borderRadius: 12,
-  },
-  navTabActive: { backgroundColor: Colors.coral },
-  navTabEmoji: { fontSize: 15 },
-  navTabLabel: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
-  navTabLabelActive: { color: '#fff' },
-
-  content: { paddingHorizontal: 16, gap: 12 },
-});

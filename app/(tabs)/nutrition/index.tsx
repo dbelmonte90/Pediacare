@@ -1,38 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import {
-  ScrollView, View, Text, StyleSheet, TouchableOpacity,
+  View, Text, StyleSheet, TouchableOpacity,
   TextInput, Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Colors } from '@/shared/theme/colors';
 import { Typography } from '@/shared/theme/typography';
 import { Card } from '@/shared/ui/Card';
+import { AppScreen } from '@/shared/ui/AppScreen';
+import { AppHeader } from '@/shared/ui/AppHeader';
+import { SegmentedControl } from '@/shared/ui/SegmentedControl';
+import { AlertCard } from '@/shared/ui/AlertCard';
+import { PrimaryButton } from '@/shared/ui/PrimaryButton';
 import { useProfileStore } from '@/store/profileStore';
 import { useNutritionStore } from '@/store/nutritionStore';
 import { FOOD_CHECKLIST, MEAL_TYPE_LABELS } from '@/shared/constants/nutritionData';
 import type { ChildProfile } from '@/entities/profile/model/types';
 import type { FoodStatus, MealType, DiaryEntry } from '@/entities/nutrition/model/types';
 
-// ─── Constants ────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<FoodStatus, { label: string; color: string; icon: string }> = {
-  not_started: { label: 'Sin iniciar',       color: Colors.textSecondary, icon: '⬜' },
-  introduced:  { label: 'Introducido',        color: Colors.skyBlue,       icon: '🔵' },
-  tolerated:   { label: 'Tolerado ✓',        color: Colors.mint,          icon: '✅' },
-  reaction:    { label: 'Reacción',          color: Colors.rose,          icon: '🚫' },
+  not_started: { label: 'Sin iniciar',  color: Colors.textSecondary, icon: '⬜' },
+  introduced:  { label: 'Introducido', color: Colors.skyBlue,       icon: '🔵' },
+  tolerated:   { label: 'Tolerado ✓', color: Colors.mint,          icon: '✅' },
+  reaction:    { label: 'Reacción',    color: Colors.rose,          icon: '🚫' },
 };
 
 const FOOD_AGE_GROUPS = ['4-6 meses', '6-8 meses', '8-10 meses', '10-12 meses', '12+ meses'];
-
 const MEAL_TYPE_OPTIONS: MealType[] = ['desayuno', 'almuerzo', 'merienda', 'cena', 'otro'];
 
 function generateId() {
   return `n-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-// ─── Allergies Card ─────────────────────────────────────────────────────────────────
+// ─── Allergies Card ───────────────────────────────────────────────────────────
 
 function AllergiesCard({ profile }: { profile: ChildProfile }) {
   const [addingAllergy, setAddingAllergy] = useState(false);
@@ -56,10 +59,7 @@ function AllergiesCard({ profile }: { profile: ChildProfile }) {
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Eliminar', style: 'destructive',
-        onPress: () =>
-          updateProfile(profile.id, {
-            allergies: profile.allergies.filter((a) => a !== allergy),
-          }),
+        onPress: () => updateProfile(profile.id, { allergies: profile.allergies.filter((a) => a !== allergy) }),
       },
     ]);
   };
@@ -157,26 +157,18 @@ const allergyStyles = StyleSheet.create({
     flex: 1, borderWidth: 1.5, borderColor: Colors.mint, borderRadius: 10,
     padding: 10, ...Typography.bodyRegular, color: Colors.textPrimary,
   },
-  confirmBtn: {
-    backgroundColor: Colors.mint, borderRadius: 10,
-    paddingHorizontal: 14, paddingVertical: 10,
-  },
+  confirmBtn: { backgroundColor: Colors.mint, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10 },
   confirmBtnDisabled: { opacity: 0.4 },
   confirmBtnText: { ...Typography.caption, color: '#fff', fontWeight: '700' },
-  cancelBtn: {
-    backgroundColor: Colors.border, borderRadius: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
-  },
+  cancelBtn: { backgroundColor: Colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   cancelBtnText: { ...Typography.caption, color: Colors.textSecondary, fontWeight: '700' },
   hint: { ...Typography.caption, color: Colors.textSecondary, fontStyle: 'italic', marginTop: 4 },
 });
 
-// ─── Food Row ──────────────────────────────────────────────────────────────────────
+// ─── Food Row ─────────────────────────────────────────────────────────────────
 
 function FoodRow({
-  food,
-  status,
-  onChangeStatus,
+  food, status, onChangeStatus,
 }: {
   food: (typeof FOOD_CHECKLIST)[number];
   status: FoodStatus;
@@ -188,17 +180,11 @@ function FoodRow({
 
   return (
     <View>
-      <TouchableOpacity
-        style={foodStyles.row}
-        onPress={() => setExpanded((v) => !v)}
-        activeOpacity={0.7}
-      >
+      <TouchableOpacity style={foodStyles.row} onPress={() => setExpanded((v) => !v)} activeOpacity={0.7}>
         <Text style={foodStyles.emoji}>{food.emoji}</Text>
         <View style={{ flex: 1 }}>
           <Text style={foodStyles.name}>{food.name}</Text>
-          {food.allergenRisk && (
-            <Text style={foodStyles.allergen}>⚠️ Alérgeno potencial</Text>
-          )}
+          {food.allergenRisk && <Text style={foodStyles.allergen}>⚠️ Alérgeno potencial</Text>}
         </View>
         <View style={[foodStyles.badge, { backgroundColor: `${cfg.color}15` }]}>
           <Text style={[foodStyles.badgeText, { color: cfg.color }]}>{cfg.label}</Text>
@@ -234,10 +220,7 @@ function FoodRow({
 }
 
 const foodStyles = StyleSheet.create({
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingVertical: 10, paddingHorizontal: 2,
-  },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, paddingHorizontal: 2 },
   emoji: { fontSize: 22, width: 32, textAlign: 'center' },
   name: { ...Typography.bodyMedium },
   allergen: { fontSize: 10, color: Colors.amber, marginTop: 1 },
@@ -252,39 +235,30 @@ const foodStyles = StyleSheet.create({
   statusOption: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     borderRadius: 8, borderWidth: 1, borderColor: Colors.border,
-    paddingHorizontal: 10, paddingVertical: 6,
-    backgroundColor: Colors.surface,
+    paddingHorizontal: 10, paddingVertical: 6, backgroundColor: Colors.surface,
   },
   statusOptionIcon: { fontSize: 14 },
   statusOptionText: { ...Typography.caption, color: Colors.textSecondary },
 });
 
-// ─── Alimentos Tab ──────────────────────────────────────────────────────────────
+// ─── Alimentos Tab ────────────────────────────────────────────────────────────
 
 function AlimentosTab({ profile }: { profile: ChildProfile }) {
-  const setFoodStatus    = useNutritionStore((s) => s.setFoodStatus);
-  const getFoodIntros    = useNutritionStore((s) => s.getFoodIntroductions);
-  const introductions    = getFoodIntros(profile.id);
+  const setFoodStatus = useNutritionStore((s) => s.setFoodStatus);
+  const getFoodIntros = useNutritionStore((s) => s.getFoodIntroductions);
+  const introductions = getFoodIntros(profile.id);
 
   const foodsByGroup = FOOD_AGE_GROUPS.reduce<Record<string, typeof FOOD_CHECKLIST>>(
-    (acc, group) => {
-      acc[group] = FOOD_CHECKLIST.filter((f) => f.ageGroup === group);
-      return acc;
-    }, {}
+    (acc, group) => { acc[group] = FOOD_CHECKLIST.filter((f) => f.ageGroup === group); return acc; }, {}
   );
 
-  const totalTolerated = FOOD_CHECKLIST.filter(
-    (f) => introductions[f.id]?.status === 'tolerated'
-  ).length;
-  const totalReactions = FOOD_CHECKLIST.filter(
-    (f) => introductions[f.id]?.status === 'reaction'
-  ).length;
+  const totalTolerated = FOOD_CHECKLIST.filter((f) => introductions[f.id]?.status === 'tolerated').length;
+  const totalReactions = FOOD_CHECKLIST.filter((f) => introductions[f.id]?.status === 'reaction').length;
 
   return (
     <View style={{ gap: 12 }}>
       <AllergiesCard profile={profile} />
 
-      {/* Summary stats */}
       <Card padding={16}>
         <Text style={alimStyles.cardLabel}>PROGRESO DE INTRODUCCIÓN</Text>
         <View style={alimStyles.statsRow}>
@@ -313,32 +287,25 @@ function AlimentosTab({ profile }: { profile: ChildProfile }) {
           </View>
         </View>
         <View style={alimStyles.progressTrack}>
-          <View style={[alimStyles.progressFill, {
-            width: `${(totalTolerated / FOOD_CHECKLIST.length) * 100}%`,
-          }]} />
+          <View style={[alimStyles.progressFill, { width: `${(totalTolerated / FOOD_CHECKLIST.length) * 100}%` as any }]} />
         </View>
         <Text style={alimStyles.progressCaption}>
           {totalTolerated} / {FOOD_CHECKLIST.length} alimentos tolerados
         </Text>
       </Card>
 
-      {/* Grouped food lists */}
       {FOOD_AGE_GROUPS.map((group) => {
         const foods = foodsByGroup[group];
-        const doneCnt = foods.filter(
-          (f) => introductions[f.id]?.status === 'tolerated'
-        ).length;
+        const doneCnt = foods.filter((f) => introductions[f.id]?.status === 'tolerated').length;
         return (
           <Card key={group} padding={0} style={{ overflow: 'hidden' }}>
             <View style={alimStyles.groupHeader}>
               <Text style={alimStyles.groupTitle}>{group}</Text>
-              <Text style={alimStyles.groupCount}>
-                {doneCnt}/{foods.length} tolerados
-              </Text>
+              <Text style={alimStyles.groupCount}>{doneCnt}/{foods.length} tolerados</Text>
             </View>
             <View style={alimStyles.groupProgressTrack}>
               <View style={[alimStyles.groupProgressFill, {
-                width: `${foods.length ? (doneCnt / foods.length) * 100 : 0}%`,
+                width: `${foods.length ? (doneCnt / foods.length) * 100 : 0}%` as any,
                 backgroundColor: doneCnt === foods.length ? Colors.mint : `${Colors.mint}80`,
               }]} />
             </View>
@@ -368,9 +335,7 @@ const alimStyles = StyleSheet.create({
   statNum: { fontSize: 24, fontWeight: '900', color: Colors.mint, letterSpacing: -0.5 },
   statLabel: { ...Typography.caption, marginTop: 1, textAlign: 'center' },
   statDiv: { width: 1, height: 32, backgroundColor: Colors.border },
-  progressTrack: {
-    height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden',
-  },
+  progressTrack: { height: 6, backgroundColor: Colors.border, borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: 6, backgroundColor: Colors.mint, borderRadius: 3 },
   progressCaption: { ...Typography.caption, textAlign: 'center', marginTop: 6, fontStyle: 'italic' },
   groupHeader: {
@@ -384,15 +349,9 @@ const alimStyles = StyleSheet.create({
   separator: { height: 1, backgroundColor: Colors.border },
 });
 
-// ─── Add Diary Entry Form ───────────────────────────────────────────────────────────
+// ─── Add Diary Form ───────────────────────────────────────────────────────────
 
-function AddDiaryForm({
-  profileId,
-  onClose,
-}: {
-  profileId: string;
-  onClose: () => void;
-}) {
+function AddDiaryForm({ profileId, onClose }: { profileId: string; onClose: () => void }) {
   const [mealType, setMealType]     = useState<MealType>('almuerzo');
   const [foodInput, setFoodInput]   = useState('');
   const [foods, setFoods]           = useState<string[]>([]);
@@ -408,9 +367,7 @@ function AddDiaryForm({
   };
 
   const handleSave = () => {
-    if (foods.length === 0) {
-      Alert.alert('Sin alimentos', 'Añade al menos un alimento.'); return;
-    }
+    if (foods.length === 0) { Alert.alert('Sin alimentos', 'Añade al menos un alimento.'); return; }
     addEntry(profileId, {
       id: generateId(),
       date: new Date().toISOString().slice(0, 10),
@@ -432,7 +389,6 @@ function AddDiaryForm({
         </TouchableOpacity>
       </View>
 
-      {/* Meal type */}
       <Text style={diaryStyles.fieldLabel}>MOMENTO DEL DÍA</Text>
       <View style={diaryStyles.mealTypeRow}>
         {MEAL_TYPE_OPTIONS.map((mt) => (
@@ -448,7 +404,6 @@ function AddDiaryForm({
         ))}
       </View>
 
-      {/* Food chips */}
       <Text style={[diaryStyles.fieldLabel, { marginTop: 12 }]}>ALIMENTOS</Text>
       {foods.length > 0 && (
         <View style={diaryStyles.chipRow}>
@@ -481,7 +436,6 @@ function AddDiaryForm({
         </TouchableOpacity>
       </View>
 
-      {/* Notes */}
       <Text style={[diaryStyles.fieldLabel, { marginTop: 12 }]}>OBSERVACIONES</Text>
       <TextInput
         style={diaryStyles.notesInput}
@@ -492,7 +446,6 @@ function AddDiaryForm({
         numberOfLines={2}
       />
 
-      {/* Reaction toggle */}
       <TouchableOpacity
         style={[diaryStyles.reactionToggle, hadReaction && diaryStyles.reactionToggleActive]}
         onPress={() => setHadReaction((v) => !v)}
@@ -549,14 +502,10 @@ function DiarioTab({ profile }: { profile: ChildProfile }) {
   return (
     <View style={{ gap: 12 }}>
       {!formOpen && (
-        <TouchableOpacity style={diaryStyles.openFormBtn} onPress={() => setFormOpen(true)}>
-          <Text style={diaryStyles.openFormText}>+ Registrar comida</Text>
-        </TouchableOpacity>
+        <PrimaryButton label="+ Registrar comida" onPress={() => setFormOpen(true)} color={Colors.mint} />
       )}
 
-      {formOpen && (
-        <AddDiaryForm profileId={profile.id} onClose={() => setFormOpen(false)} />
-      )}
+      {formOpen && <AddDiaryForm profileId={profile.id} onClose={() => setFormOpen(false)} />}
 
       {entries.length === 0 && !formOpen && (
         <Card padding={20}>
@@ -585,25 +534,15 @@ function DiarioTab({ profile }: { profile: ChildProfile }) {
               activeOpacity={0.75}
             >
               <View style={diaryStyles.entryLeft}>
-                <Text style={diaryStyles.entryMealType}>
-                  {MEAL_TYPE_LABELS[entry.mealType]}
-                </Text>
-                <Text style={diaryStyles.entryFoods}>
-                  {entry.foods.join(' · ')}
-                </Text>
-                {entry.notes ? (
-                  <Text style={diaryStyles.entryNotes}>{entry.notes}</Text>
-                ) : null}
+                <Text style={diaryStyles.entryMealType}>{MEAL_TYPE_LABELS[entry.mealType]}</Text>
+                <Text style={diaryStyles.entryFoods}>{entry.foods.join(' · ')}</Text>
+                {entry.notes ? <Text style={diaryStyles.entryNotes}>{entry.notes}</Text> : null}
               </View>
               <View style={diaryStyles.entryRight}>
                 {entry.hadReaction ? (
-                  <View style={diaryStyles.reactionBadge}>
-                    <Text style={diaryStyles.reactionBadgeText}>🚫 Reacción</Text>
-                  </View>
+                  <View style={diaryStyles.reactionBadge}><Text style={diaryStyles.reactionBadgeText}>🚫 Reacción</Text></View>
                 ) : (
-                  <View style={diaryStyles.okBadge}>
-                    <Text style={diaryStyles.okBadgeText}>✓ OK</Text>
-                  </View>
+                  <View style={diaryStyles.okBadge}><Text style={diaryStyles.okBadgeText}>✓ OK</Text></View>
                 )}
               </View>
             </TouchableOpacity>
@@ -611,27 +550,18 @@ function DiarioTab({ profile }: { profile: ChildProfile }) {
         </Card>
       ))}
 
-      {entries.length > 0 && (
-        <Text style={diaryStyles.hint}>Mantén pulsado para eliminar</Text>
-      )}
+      {entries.length > 0 && <Text style={diaryStyles.hint}>Mantén pulsado para eliminar</Text>}
     </View>
   );
 }
 
 const diaryStyles = StyleSheet.create({
-  openFormBtn: {
-    backgroundColor: Colors.mint, borderRadius: 14, paddingVertical: 14, alignItems: 'center',
-  },
-  openFormText: { ...Typography.bodyMedium, color: '#fff', fontWeight: '700' },
   formHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   cardLabel: { ...Typography.labelUppercase },
   closeBtn: { fontSize: 18, color: Colors.textSecondary, padding: 4 },
   fieldLabel: { ...Typography.labelUppercase, marginBottom: 6 },
   mealTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  mealChip: {
-    paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10,
-    backgroundColor: Colors.border, borderWidth: 1, borderColor: 'transparent',
-  },
+  mealChip: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10, backgroundColor: Colors.border, borderWidth: 1, borderColor: 'transparent' },
   mealChipActive: { backgroundColor: `${Colors.mint}15`, borderColor: Colors.mint },
   mealChipText: { ...Typography.caption, color: Colors.textSecondary },
   mealChipTextActive: { color: Colors.mint, fontWeight: '700' },
@@ -644,34 +574,20 @@ const diaryStyles = StyleSheet.create({
   foodChipText: { ...Typography.caption, color: Colors.mint, fontWeight: '600' },
   foodChipRemove: { fontSize: 10, color: Colors.mint, fontWeight: '700' },
   foodInputRow: { flexDirection: 'row', gap: 8 },
-  foodInput: {
-    flex: 1, borderWidth: 1.5, borderColor: Colors.mint, borderRadius: 10,
-    padding: 10, ...Typography.bodyRegular, color: Colors.textPrimary,
-  },
-  addFoodBtn: {
-    width: 42, height: 42, borderRadius: 10, backgroundColor: Colors.mint,
-    alignItems: 'center', justifyContent: 'center',
-  },
+  foodInput: { flex: 1, borderWidth: 1.5, borderColor: Colors.mint, borderRadius: 10, padding: 10, ...Typography.bodyRegular, color: Colors.textPrimary },
+  addFoodBtn: { width: 42, height: 42, borderRadius: 10, backgroundColor: Colors.mint, alignItems: 'center', justifyContent: 'center' },
   addFoodBtnDisabled: { opacity: 0.4 },
   addFoodBtnText: { fontSize: 22, color: '#fff', fontWeight: '700', lineHeight: 24 },
-  notesInput: {
-    borderWidth: 1, borderColor: Colors.border, borderRadius: 10,
-    padding: 10, ...Typography.bodyRegular, minHeight: 56,
-  },
+  notesInput: { borderWidth: 1, borderColor: Colors.border, borderRadius: 10, padding: 10, ...Typography.bodyRegular, minHeight: 56 },
   reactionToggle: {
     flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10,
     backgroundColor: `${Colors.mint}12`, borderRadius: 12, padding: 12,
     borderWidth: 1, borderColor: `${Colors.mint}25`,
   },
-  reactionToggleActive: {
-    backgroundColor: `${Colors.rose}10`, borderColor: `${Colors.rose}30`,
-  },
+  reactionToggleActive: { backgroundColor: `${Colors.rose}10`, borderColor: `${Colors.rose}30` },
   reactionToggleIcon: { fontSize: 18 },
   reactionToggleText: { ...Typography.bodyMedium, color: Colors.mint, fontWeight: '600' },
-  saveBtn: {
-    backgroundColor: Colors.mint, borderRadius: 12, paddingVertical: 14,
-    alignItems: 'center', marginTop: 12,
-  },
+  saveBtn: { backgroundColor: Colors.mint, borderRadius: 12, paddingVertical: 14, alignItems: 'center', marginTop: 12 },
   saveBtnDisabled: { opacity: 0.4 },
   saveBtnText: { ...Typography.bodyMedium, color: '#fff', fontWeight: '700' },
   dateHeader: {
@@ -688,49 +604,38 @@ const diaryStyles = StyleSheet.create({
   entryFoods: { ...Typography.bodyMedium },
   entryNotes: { ...Typography.caption, fontStyle: 'italic', marginTop: 2 },
   entryRight: { alignItems: 'flex-end', justifyContent: 'center', paddingTop: 2 },
-  reactionBadge: {
-    backgroundColor: `${Colors.rose}12`, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3,
-  },
+  reactionBadge: { backgroundColor: `${Colors.rose}12`, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   reactionBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.rose },
-  okBadge: {
-    backgroundColor: `${Colors.mint}12`, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3,
-  },
+  okBadge: { backgroundColor: `${Colors.mint}12`, borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 },
   okBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.mint },
   emptyText: { ...Typography.bodyRegular, textAlign: 'center', lineHeight: 22 },
   hint: { ...Typography.caption, textAlign: 'center', color: Colors.textSecondary, fontStyle: 'italic' },
 });
 
-// ─── Reacciones Tab ─────────────────────────────────────────────────────────────
+// ─── Reacciones Tab ───────────────────────────────────────────────────────────
 
 function ReaccionesTab({ profile }: { profile: ChildProfile }) {
   const getFoodIntros   = useNutritionStore((s) => s.getFoodIntroductions);
   const getDiaryEntries = useNutritionStore((s) => s.getDiaryEntries);
-
   const introductions = getFoodIntros(profile.id);
   const entries       = getDiaryEntries(profile.id);
 
-  const foodReactions = FOOD_CHECKLIST.filter(
-    (f) => introductions[f.id]?.status === 'reaction'
-  );
-
+  const foodReactions  = FOOD_CHECKLIST.filter((f) => introductions[f.id]?.status === 'reaction');
   const diaryReactions = entries.filter((e) => e.hadReaction);
-
   const totalReactions = foodReactions.length + diaryReactions.length;
 
   return (
     <View style={{ gap: 12 }}>
-      {/* Disclaimer */}
       <View style={reacStyles.disclaimer}>
         <Text style={reacStyles.disclaimerIcon}>⚕️</Text>
         <Text style={reacStyles.disclaimerText}>
           Este historial es <Text style={{ fontWeight: '700' }}>meramente informativo</Text> y no sustituye
           la evaluación por un{' '}
-          <Text style={{ fontWeight: '700' }}>aler gólogo o pediatra</Text>.
+          <Text style={{ fontWeight: '700' }}>alergólogo o pediatra</Text>.
           Ante cualquier reacción grave, acude a urgencias inmediatamente.
         </Text>
       </View>
 
-      {/* Allergy badge summary */}
       {profile.allergies.length > 0 && (
         <Card padding={14}>
           <Text style={reacStyles.cardLabel}>ALERGIAS CONOCIDAS</Text>
@@ -748,14 +653,11 @@ function ReaccionesTab({ profile }: { profile: ChildProfile }) {
         <Card padding={20}>
           <View style={{ alignItems: 'center', gap: 8 }}>
             <Text style={{ fontSize: 36 }}>✅</Text>
-            <Text style={reacStyles.emptyText}>
-              Sin reacciones registradas. ¡Excelente!
-            </Text>
+            <Text style={reacStyles.emptyText}>Sin reacciones registradas. ¡Excelente!</Text>
           </View>
         </Card>
       )}
 
-      {/* Food checklist reactions */}
       {foodReactions.length > 0 && (
         <Card padding={0} style={{ overflow: 'hidden' }}>
           <View style={reacStyles.sectionHeader}>
@@ -770,12 +672,10 @@ function ReaccionesTab({ profile }: { profile: ChildProfile }) {
                   <Text style={reacStyles.eventFood}>{food.name}</Text>
                   {intro?.dateIntroduced && (
                     <Text style={reacStyles.eventDate}>
-                      {format(parseISO(intro.dateIntroduced), "d MMM yyyy", { locale: es })}
+                      {format(parseISO(intro.dateIntroduced), 'd MMM yyyy', { locale: es })}
                     </Text>
                   )}
-                  {intro?.notes && (
-                    <Text style={reacStyles.eventNotes}>{intro.notes}</Text>
-                  )}
+                  {intro?.notes && <Text style={reacStyles.eventNotes}>{intro.notes}</Text>}
                 </View>
                 {food.allergenRisk && (
                   <View style={reacStyles.allergenBadge}>
@@ -788,7 +688,6 @@ function ReaccionesTab({ profile }: { profile: ChildProfile }) {
         </Card>
       )}
 
-      {/* Diary reactions */}
       {diaryReactions.length > 0 && (
         <Card padding={0} style={{ overflow: 'hidden' }}>
           <View style={reacStyles.sectionHeader}>
@@ -834,37 +733,28 @@ const reacStyles = StyleSheet.create({
   },
   allergyChipText: { ...Typography.bodyMedium, color: Colors.rose, fontWeight: '700' },
   emptyText: { ...Typography.bodyRegular, textAlign: 'center', lineHeight: 22 },
-  sectionHeader: {
-    paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6,
-    backgroundColor: `${Colors.rose}06`,
-  },
+  sectionHeader: { paddingHorizontal: 14, paddingTop: 12, paddingBottom: 6, backgroundColor: `${Colors.rose}06` },
   sectionTitle: { ...Typography.labelUppercase, color: Colors.rose, fontSize: 10 },
   eventRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
   eventBorder: { borderTopWidth: 1, borderTopColor: Colors.border },
   eventEmoji: { fontSize: 22, width: 30, textAlign: 'center', marginTop: 2 },
-  eventDateBox: {
-    width: 42, alignItems: 'center',
-    backgroundColor: `${Colors.rose}10`, borderRadius: 10, paddingVertical: 6,
-  },
+  eventDateBox: { width: 42, alignItems: 'center', backgroundColor: `${Colors.rose}10`, borderRadius: 10, paddingVertical: 6 },
   eventDateBoxText: { fontSize: 11, fontWeight: '700', color: Colors.rose },
   eventDateBoxYear: { fontSize: 9, color: Colors.textSecondary },
   eventMeal: { ...Typography.caption, color: Colors.mint, fontWeight: '700', marginBottom: 2 },
   eventFood: { ...Typography.bodyMedium },
   eventDate: { ...Typography.caption, marginTop: 1 },
   eventNotes: { ...Typography.caption, fontStyle: 'italic', marginTop: 3, color: Colors.textSecondary },
-  allergenBadge: {
-    backgroundColor: `${Colors.amber}15`, borderRadius: 6,
-    paddingHorizontal: 7, paddingVertical: 3,
-  },
+  allergenBadge: { backgroundColor: `${Colors.amber}15`, borderRadius: 6, paddingHorizontal: 7, paddingVertical: 3 },
   allergenBadgeText: { fontSize: 10, fontWeight: '700', color: Colors.amber },
 });
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 const NAV_SECTIONS = [
-  { key: 'alimentos', label: 'Alimentos', emoji: '🥦' },
-  { key: 'diario',    label: 'Diario',    emoji: '📔' },
-  { key: 'reacciones',label: 'Reacciones',emoji: '⚠️' },
+  { key: 'alimentos',  label: 'Alimentos',  emoji: '🥦' },
+  { key: 'diario',     label: 'Diario',     emoji: '📔' },
+  { key: 'reacciones', label: 'Reacciones', emoji: '⚠️' },
 ] as const;
 
 type Section = typeof NAV_SECTIONS[number]['key'];
@@ -893,132 +783,44 @@ export default function NutritionScreen() {
     ).length;
 
   return (
-    <SafeAreaView style={screenStyles.safe} edges={['bottom']}>
-      <ScrollView contentContainerStyle={screenStyles.scroll} showsVerticalScrollIndicator={false}>
-
-        {/* ── Hero ── */}
-        <View style={screenStyles.hero}>
-          <View style={screenStyles.heroTop}>
-            <View>
-              <Text style={screenStyles.heroTitle}>Nutrición</Text>
-              <Text style={screenStyles.heroName}>{profile.name}</Text>
+    <AppScreen edges={['bottom']} statusBarStyle="light-content">
+      <AppHeader title="Nutrición" subtitle={profile.name} section="nutrition">
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+          {profile.allergies.length > 0 && (
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>⚠️ {profile.allergies.length} alergia{profile.allergies.length !== 1 ? 's' : ''}</Text>
             </View>
-            <View style={screenStyles.heroRight}>
-              {profile.allergies.length > 0 && (
-                <View style={screenStyles.allergyWarning}>
-                  <Text style={screenStyles.allergyWarningIcon}>⚠️</Text>
-                  <Text style={screenStyles.allergyWarningText}>
-                    {profile.allergies.length} alergia{profile.allergies.length !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-              )}
-              {reactionCount > 0 && (
-                <View style={screenStyles.reactionBadge}>
-                  <Text style={screenStyles.reactionBadgeText}>
-                    🚫 {reactionCount} reacción{reactionCount !== 1 ? 'es' : ''}
-                  </Text>
-                </View>
-              )}
+          )}
+          {reactionCount > 0 && (
+            <View style={{ backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 12 }}>🚫 {reactionCount} reacción{reactionCount !== 1 ? 'es' : ''}</Text>
             </View>
-          </View>
+          )}
         </View>
+      </AppHeader>
 
-        {/* Permanent allergy banner when allergies exist */}
-        {profile.allergies.length > 0 && (
-          <View style={screenStyles.allergyBanner}>
-            <Text style={screenStyles.allergyBannerIcon}>⚠️</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={screenStyles.allergyBannerLabel}>ALERGIAS REGISTRADAS</Text>
-              <Text style={screenStyles.allergyBannerList}>
-                {profile.allergies.join(' · ')}
-              </Text>
-            </View>
-          </View>
-        )}
-
-        {/* ── Section Nav ── */}
-        <View style={screenStyles.navSection}>
-          <View style={screenStyles.navTabs}>
-            {NAV_SECTIONS.map((s) => (
-              <TouchableOpacity
-                key={s.key}
-                style={[screenStyles.navTab, section === s.key && screenStyles.navTabActive]}
-                onPress={() => setSection(s.key)}
-              >
-                <Text style={screenStyles.navTabEmoji}>{s.emoji}</Text>
-                <Text style={[screenStyles.navTabLabel, section === s.key && screenStyles.navTabLabelActive]}>
-                  {s.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      {profile.allergies.length > 0 && (
+        <View style={{ marginHorizontal: 16, marginTop: 10 }}>
+          <AlertCard type="warning" title="ALERGIAS REGISTRADAS">
+            <Text style={{ ...Typography.bodyMedium }}>{profile.allergies.join(' · ')}</Text>
+          </AlertCard>
         </View>
+      )}
 
-        {/* ── Sections ── */}
-        <View style={screenStyles.content}>
-          {section === 'alimentos'  && <AlimentosTab  profile={profile} />}
-          {section === 'diario'     && <DiarioTab     profile={profile} />}
-          {section === 'reacciones' && <ReaccionesTab profile={profile} />}
-        </View>
+      <SegmentedControl
+        segments={NAV_SECTIONS.map((s) => ({ key: s.key, label: s.label, emoji: s.emoji }))}
+        value={section}
+        onChange={setSection}
+        activeColor={Colors.mint}
+      />
 
-        <View style={{ height: 24 }} />
-      </ScrollView>
-    </SafeAreaView>
+      <View style={{ paddingHorizontal: 16, gap: 12 }}>
+        {section === 'alimentos'  && <AlimentosTab  profile={profile} />}
+        {section === 'diario'     && <DiarioTab     profile={profile} />}
+        {section === 'reacciones' && <ReaccionesTab profile={profile} />}
+      </View>
+
+      <View style={{ height: 24 }} />
+    </AppScreen>
   );
 }
-
-const screenStyles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: Colors.background },
-  scroll: { paddingBottom: 32 },
-
-  hero: {
-    backgroundColor: Colors.gradients.nutrition[0],
-    paddingTop: 28, paddingBottom: 28, paddingHorizontal: 20,
-    borderBottomLeftRadius: 32, borderBottomRightRadius: 32,
-    marginBottom: 8,
-  },
-  heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  heroTitle: { fontSize: 34, fontWeight: '900', color: '#fff', letterSpacing: -1 },
-  heroName: { ...Typography.headingBold, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
-  heroRight: { alignItems: 'flex-end', gap: 8 },
-  allergyWarning: {
-    flexDirection: 'row', alignItems: 'center', gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  allergyWarningIcon: { fontSize: 13 },
-  allergyWarningText: { ...Typography.caption, color: '#fff', fontWeight: '700' },
-  reactionBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 5,
-  },
-  reactionBadgeText: { ...Typography.caption, color: '#fff', fontWeight: '700' },
-
-  allergyBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    backgroundColor: `${Colors.amber}15`, borderRadius: 12, padding: 12,
-    marginHorizontal: 16, marginTop: 10,
-    borderWidth: 1, borderColor: `${Colors.amber}35`,
-  },
-  allergyBannerIcon: { fontSize: 20 },
-  allergyBannerLabel: { ...Typography.labelUppercase, color: Colors.amber, fontSize: 9 },
-  allergyBannerList: { ...Typography.bodyMedium, marginTop: 1 },
-
-  navSection: { paddingHorizontal: 16, marginTop: 12, marginBottom: 12 },
-  navTabs: {
-    flexDirection: 'row', backgroundColor: Colors.surface,
-    borderRadius: 16, padding: 4, gap: 4,
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1, shadowRadius: 8, elevation: 3,
-  },
-  navTab: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 5, paddingVertical: 10, borderRadius: 12,
-  },
-  navTabActive: { backgroundColor: Colors.mint },
-  navTabEmoji: { fontSize: 15 },
-  navTabLabel: { ...Typography.caption, fontWeight: '600', color: Colors.textSecondary },
-  navTabLabelActive: { color: '#fff' },
-
-  content: { paddingHorizontal: 16, gap: 12 },
-});

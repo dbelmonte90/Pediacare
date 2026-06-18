@@ -13,6 +13,7 @@ import type { FoodStatus, FoodIntroduction, DiaryEntry } from '@/entities/nutrit
 interface NutritionState {
   foodIntroductions: Record<string, Record<string, FoodIntroduction>>;
   diaryEntries:      Record<string, DiaryEntry[]>;
+  _hasHydrated:      boolean;
 }
 
 interface NutritionActions {
@@ -29,6 +30,7 @@ export const useNutritionStore = create<NutritionState & NutritionActions>()(
     immer((set, get) => ({
       foodIntroductions: {},
       diaryEntries:      {},
+      _hasHydrated:      false,
 
       setFoodStatus(profileId, foodId, status, notes) {
         set((state) => {
@@ -86,6 +88,9 @@ export const useNutritionStore = create<NutritionState & NutritionActions>()(
     {
       name: 'nutrition-store',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => () => {
+        useNutritionStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

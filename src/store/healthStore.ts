@@ -15,6 +15,7 @@ interface HealthState {
   growthRecords:  Record<string, GrowthRecord[]>;
   vaccineStatus:  Record<string, Record<string, boolean>>; // profileId → vaccineId → done
   symptomLogs:    Record<string, SymptomLog[]>;
+  _hasHydrated:   boolean;
 }
 
 interface HealthActions {
@@ -36,6 +37,7 @@ export const useHealthStore = create<HealthState & HealthActions>()(
       growthRecords: {},
       vaccineStatus: {},
       symptomLogs:   {},
+      _hasHydrated:  false,
 
       addGrowthRecord(profileId, record) {
         set((state) => {
@@ -126,6 +128,9 @@ export const useHealthStore = create<HealthState & HealthActions>()(
     {
       name: 'health-store',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => () => {
+        useHealthStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

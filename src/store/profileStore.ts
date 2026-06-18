@@ -8,6 +8,7 @@ import { MOCK_PROFILES } from '@/shared/constants/mockProfiles';
 interface ProfileState {
   profiles: Profile[];
   activeProfileId: string | null;
+  _hasHydrated: boolean;
 }
 
 interface ProfileActions {
@@ -23,6 +24,7 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
     immer((set, get) => ({
       profiles: MOCK_PROFILES,
       activeProfileId: MOCK_PROFILES[0]?.id ?? null,
+      _hasHydrated: false,
 
       activeProfile: () => {
         const { profiles, activeProfileId } = get();
@@ -57,6 +59,9 @@ export const useProfileStore = create<ProfileState & ProfileActions>()(
     {
       name: 'pediacare-profiles',
       storage: createJSONStorage(() => AsyncStorage),
+      onRehydrateStorage: () => () => {
+        useProfileStore.setState({ _hasHydrated: true });
+      },
     }
   )
 );

@@ -19,7 +19,7 @@ const STORE_KEYS = [
  * Intended for dev/QA use only.
  */
 export async function resetAppData(): Promise<void> {
-  await AsyncStorage.multiRemove(STORE_KEYS);
+  await Promise.all(STORE_KEYS.map((key) => AsyncStorage.removeItem(key)));
 
   useProfileStore.setState({
     profiles: [...MOCK_PROFILES],
